@@ -4,7 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
 // Import Routes
 import authRoutes from './routes/authRoutes.js';
@@ -18,7 +18,6 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 
-dotenv.config();
 
 const app = express();
 
@@ -26,7 +25,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://internship-projects-beige.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 // 1. Security Headers
 app.use(helmet({
@@ -34,14 +33,9 @@ app.use(helmet({
 }));
 
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "https://internship-projects-beige.vercel.app"
-];
-
-if (FRONTEND_URL && !allowedOrigins.includes(FRONTEND_URL)) {
-  allowedOrigins.push(FRONTEND_URL);
-}
+  'http://localhost:5173',
+  FRONTEND_URL,
+].filter(Boolean);
 
 // 2. CORS configuration
 app.use(cors({
