@@ -1,0 +1,394 @@
+[
+  {
+    "id": "ULB-AJM-NN-001",
+    "division": "Ajmer Division",
+    "district": "Ajmer",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Ajmer Nagar Nigam",
+    "wards": ["Ward 1 (Ana Sagar)", "Ward 2 (Dargah Area)", "Ward 3 (Vaishali Nagar)", "Ward 4 (Adarsh Nagar)", "Ward 5 (Shastri Nagar)"]
+  },
+  {
+    "id": "ULB-BHA-NN-001",
+    "division": "Bharatpur Division",
+    "district": "Bharatpur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Bharatpur Nagar Nigam",
+    "wards": ["Ward 1 (Lohagarh)", "Ward 2 (Ranjeet Nagar)", "Ward 3 (Krishna Nagar)", "Ward 4 (Madan Mohan)"]
+  },
+  {
+    "id": "ULB-BIK-NN-001",
+    "division": "Bikaner Division",
+    "district": "Bikaner",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Bikaner Nagar Nigam",
+    "wards": ["Ward 1 (Gangashahar)", "Ward 2 (Kote Gate)", "Ward 3 (Junagarh)", "Ward 4 (Ambedkar Circle)"]
+  },
+  {
+    "id": "ULB-JAI-NN-001",
+    "division": "Jaipur Division",
+    "district": "Jaipur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Jaipur Nagar Nigam Greater",
+    "wards": ["Ward 1 (Malviya Nagar)", "Ward 2 (Mansarovar)", "Ward 3 (Sanganer)", "Ward 4 (Vaishali Nagar)", "Ward 5 (Jagatpura)"]
+  },
+  {
+    "id": "ULB-JAI-NN-002",
+    "division": "Jaipur Division",
+    "district": "Jaipur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Jaipur Nagar Nigam Heritage",
+    "wards": ["Ward 6 (Hawa Mahal)", "Ward 7 (Amer Fort)", "Ward 8 (Civil Lines)", "Ward 9 (Johri Bazar)"]
+  },
+  {
+    "id": "ULB-JOD-NN-001",
+    "division": "Jodhpur Division",
+    "district": "Jodhpur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Jodhpur Nagar Nigam North",
+    "wards": ["Ward 1 (Sardarpura)", "Ward 2 (Mandore)", "Ward 3 (Paota)", "Ward 4 (Maha Mandir)"]
+  },
+  {
+    "id": "ULB-JOD-NN-002",
+    "division": "Jodhpur Division",
+    "district": "Jodhpur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Jodhpur Nagar Nigam South",
+    "wards": ["Ward 5 (Shastri Nagar)", "Ward 6 (Ratanada)", "Ward 7 (Kudi Bhagtasni)", "Ward 8 (Basni)"]
+  },
+  {
+    "id": "ULB-KOT-NN-001",
+    "division": "Kota Division",
+    "district": "Kota",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Kota Nagar Nigam North",
+    "wards": ["Ward 1 (Vigyan Nagar)", "Ward 2 (Dadabari)", "Ward 3 (Talwandi)", "Ward 4 (Jawahar Nagar)"]
+  },
+  {
+    "id": "ULB-KOT-NN-002",
+    "division": "Kota Division",
+    "district": "Kota",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Kota Nagar Nigam South",
+    "wards": ["Ward 5 (Nayapura)", "Ward 6 (Kunhadi)", "Ward 7 (Station Road)", "Ward 8 (Bhimganj)"]
+  },
+  {
+    "id": "ULB-UDA-NN-001",
+    "division": "Udaipur Division",
+    "district": "Udaipur",
+    "ulbType": "Nagar Nigam",
+    "ulbName": "Udaipur Nagar Nigam",
+    "wards": ["Ward 1 (Lake Palace)", "Ward 2 (Fateh Sagar)", "Ward 3 (Hiran Magri)", "Ward 4 (Sector 4)"]
+  },
+  {
+    "id": "ULB-ALW-NP-001",
+    "division": "Jaipur Division",
+    "district": "Alwar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Alwar",
+    "wards": ["Ward 1 (Manu Marg)", "Ward 2 (Hope Circus)", "Ward 3 (Aravali Vihar)"]
+  },
+  {
+    "id": "ULB-BAL-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Balotra",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Balotra",
+    "wards": ["Ward 1 (Jasol Gate)", "Ward 2 (Industrial Area)", "Ward 3 (Balotra Market)"]
+  },
+  {
+    "id": "ULB-BAN-NP-001",
+    "division": "Udaipur Division",
+    "district": "Banswara",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Banswara",
+    "wards": ["Ward 1 (Mahi Dam Road)", "Ward 2 (Custom Chauraha)", "Ward 3 (Dahod Road)"]
+  },
+  {
+    "id": "ULB-BAR-NP-001",
+    "division": "Kota Division",
+    "district": "Baran",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Baran",
+    "wards": ["Ward 1 (Pratap Chowk)", "Ward 2 (Hospital Road)", "Ward 3 (Shivaji Nagar)"]
+  },
+  {
+    "id": "ULB-BMR-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Barmer",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Barmer",
+    "wards": ["Ward 1 (Station Road)", "Ward 2 (Nehru Nagar)", "Ward 3 (Sindhari Road)"]
+  },
+  {
+    "id": "ULB-BEA-NP-001",
+    "division": "Ajmer Division",
+    "district": "Beawar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Beawar",
+    "wards": ["Ward 1 (Chang Gate)", "Ward 2 (Sendra Road)", "Ward 3 (Station Road)"]
+  },
+  {
+    "id": "ULB-BHI-NP-001",
+    "division": "Ajmer Division",
+    "district": "Bhilwara",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Bhilwara",
+    "wards": ["Ward 1 (Pur Road)", "Ward 2 (Gandhi Nagar)", "Ward 3 (Subhash Nagar)"]
+  },
+  {
+    "id": "ULB-BUN-NP-001",
+    "division": "Kota Division",
+    "district": "Bundi",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Bundi",
+    "wards": ["Ward 1 (Taragarh Fort)", "Ward 2 (Khoja Gate)", "Ward 3 (Nainwa Road)"]
+  },
+  {
+    "id": "ULB-CHI-NP-001",
+    "division": "Udaipur Division",
+    "district": "Chittorgarh",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Chittorgarh",
+    "wards": ["Ward 1 (Fort Road)", "Ward 2 (Senthi Road)", "Ward 3 (Collectorate)"]
+  },
+  {
+    "id": "ULB-CHU-NP-001",
+    "division": "Bikaner Division",
+    "district": "Churu",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Churu",
+    "wards": ["Ward 1 (Dharm Stupa)", "Ward 2 (Naya Bass)", "Ward 3 (Station Road)"]
+  },
+  {
+    "id": "ULB-DAU-NP-001",
+    "division": "Jaipur Division",
+    "district": "Dausa",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Dausa",
+    "wards": ["Ward 1 (Somnath Nagar)", "Ward 2 (Gupta Gujrat)", "Ward 3 (Agra Road)"]
+  },
+  {
+    "id": "ULB-DEE-NP-001",
+    "division": "Bharatpur Division",
+    "district": "Deeg",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Deeg",
+    "wards": ["Ward 1 (Deeg Palace)", "Ward 2 (Jal Mahal Road)", "Ward 3 (Main Market)"]
+  },
+  {
+    "id": "ULB-DHO-NP-001",
+    "division": "Bharatpur Division",
+    "district": "Dholpur",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Dholpur",
+    "wards": ["Ward 1 (Machkund Road)", "Ward 2 (Shergarh Fort)", "Ward 3 (Agra Road)"]
+  },
+  {
+    "id": "ULB-HAN-NP-001",
+    "division": "Bikaner Division",
+    "district": "Hanumangarh",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Hanumangarh",
+    "wards": ["Ward 1 (Junction Area)", "Ward 2 (Town Area)", "Ward 3 (Bhadra Road)"]
+  },
+  {
+    "id": "ULB-JAI-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Jaisalmer",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Jaisalmer",
+    "wards": ["Ward 1 (Golden Fort)", "Ward 2 (Sam Road)", "Ward 3 (Gadsisar Lake)"]
+  },
+  {
+    "id": "ULB-JAL-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Jalore",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Jalore",
+    "wards": ["Ward 1 (Jalore Fort)", "Ward 2 (Bagoda Road)", "Ward 3 (Shivaji Nagar)"]
+  },
+  {
+    "id": "ULB-JHA-NP-001",
+    "division": "Kota Division",
+    "district": "Jhalawar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Jhalawar",
+    "wards": ["Ward 1 (Garh Palace)", "Ward 2 (Jhalrapatan)", "Ward 3 (Mama Bhanja)"]
+  },
+  {
+    "id": "ULB-JHU-NP-001",
+    "division": "Jaipur Division",
+    "district": "Jhunjhunu",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Jhunjhunu",
+    "wards": ["Ward 1 (Gandhi Nagar)", "Ward 2 (Mandawa Road)", "Ward 3 (Collectorate)"]
+  },
+  {
+    "id": "ULB-KAR-NP-001",
+    "division": "Bharatpur Division",
+    "district": "Karauli",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Karauli",
+    "wards": ["Ward 1 (Madan Mohan Temple)", "Ward 2 (Hindaun Gate)", "Ward 3 (Bayana Road)"]
+  },
+  {
+    "id": "ULB-DID-NP-001",
+    "division": "Ajmer Division",
+    "district": "Didwana-Kuchaman",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Kuchaman City",
+    "wards": ["Ward 1 (Kuchaman Fort)", "Ward 2 (Station Road)", "Ward 3 (Naya Bazar)"]
+  },
+  {
+    "id": "ULB-KOT-NP-001",
+    "division": "Jaipur Division",
+    "district": "Kotputli-Behror",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Kotputli",
+    "wards": ["Ward 1 (Kotputli Center)", "Ward 2 (Panna Lal)", "Ward 3 (NH-48 Corridor)"]
+  },
+  {
+    "id": "ULB-NAG-NP-001",
+    "division": "Ajmer Division",
+    "district": "Nagaur",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Nagaur",
+    "wards": ["Ward 1 (Ahata Choki)", "Ward 2 (Fort Road)", "Ward 3 (Bikaner Bypass)"]
+  },
+  {
+    "id": "ULB-PAL-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Pali",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Pali",
+    "wards": ["Ward 1 (Suraj Pole)", "Ward 2 (Industrial Area)", "Ward 3 (Somnath Mandir)"]
+  },
+  {
+    "id": "ULB-PHA-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Phalodi",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Phalodi",
+    "wards": ["Ward 1 (Phalodi Fort)", "Ward 2 (Salt Area)", "Ward 3 (Station Road)"]
+  },
+  {
+    "id": "ULB-PRA-NP-001",
+    "division": "Udaipur Division",
+    "district": "Pratapgarh",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Pratapgarh",
+    "wards": ["Ward 1 (Deepnath Temple)", "Ward 2 (Fort Road)", "Ward 3 (Banswara Road)"]
+  },
+  {
+    "id": "ULB-RAJ-NP-001",
+    "division": "Udaipur Division",
+    "district": "Rajsamand",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Rajsamand",
+    "wards": ["Ward 1 (Kankroli)", "Ward 2 (Rajsamand Lake)", "Ward 3 (Nathdwara Gate)"]
+  },
+  {
+    "id": "ULB-SAL-NP-001",
+    "division": "Udaipur Division",
+    "district": "Salumbar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Salumbar",
+    "wards": ["Ward 1 (Salumbar Fort)", "Ward 2 (Main Market)", "Ward 3 (Banswara Road)"]
+  },
+  {
+    "id": "ULB-SMA-NP-001",
+    "division": "Bharatpur Division",
+    "district": "Sawai Madhopur",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Sawai Madhopur",
+    "wards": ["Ward 1 (Ranthambore Road)", "Ward 2 (Alanpur)", "Ward 3 (Collectorate Area)"]
+  },
+  {
+    "id": "ULB-SIK-NP-001",
+    "division": "Jaipur Division",
+    "district": "Sikar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Sikar",
+    "wards": ["Ward 1 (Kalyan Circle)", "Ward 2 (Piprali Road)", "Ward 3 (Nawalgarh Road)"]
+  },
+  {
+    "id": "ULB-SIR-NP-001",
+    "division": "Jodhpur Division",
+    "district": "Sirohi",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Sirohi",
+    "wards": ["Ward 1 (Sarneshwar Ji)", "Ward 2 (Palace Road)", "Ward 3 (Goyali Chauraha)"]
+  },
+  {
+    "id": "ULB-SGR-NP-001",
+    "division": "Bikaner Division",
+    "district": "Sri Ganganagar",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Sri Ganganagar",
+    "wards": ["Ward 1 (Gol Market)", "Ward 2 (Jawahar Nagar)", "Ward 3 (Chahal Chowk)"]
+  },
+  {
+    "id": "ULB-TON-NP-001",
+    "division": "Ajmer Division",
+    "district": "Tonk",
+    "ulbType": "Nagar Parishad",
+    "ulbName": "Nagar Parishad Tonk",
+    "wards": ["Ward 1 (Sawai Madhopur Road)", "Ward 2 (Civil Lines)", "Ward 3 (Subhash Bazar)"]
+  },
+  {
+    "id": "ULB-KOB-NK-001",
+    "division": "Jaipur Division",
+    "district": "Kotputli-Behror",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Behror",
+    "wards": ["Ward 1 (Santi Nagar)", "Ward 2 (Kailash Vihar)", "Ward 3 (Behror Circle)"]
+  },
+  {
+    "id": "ULB-DID-NK-001",
+    "division": "Ajmer Division",
+    "district": "Didwana-Kuchaman",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Didwana",
+    "wards": ["Ward 1 (Didwana Town)", "Ward 2 (Salt Lake Road)", "Ward 3 (Court Complex)"]
+  },
+  {
+    "id": "ULB-KHT-NK-001",
+    "division": "Jaipur Division",
+    "district": "Khairthal-Tijara",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Khairthal",
+    "wards": ["Ward 1 (Krishi Mandi)", "Ward 2 (Khairthal Station)", "Ward 3 (Harsoli Road)"]
+  },
+  {
+    "id": "ULB-KHT-NK-002",
+    "division": "Jaipur Division",
+    "district": "Khairthal-Tijara",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Tijara",
+    "wards": ["Ward 1 (Tijara Fort)", "Ward 2 (Jain Temple)", "Ward 3 (Bus Stand)"]
+  },
+  {
+    "id": "ULB-DUN-NK-001",
+    "division": "Udaipur Division",
+    "district": "Dungarpur",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Dungarpur",
+    "wards": ["Ward 1 (Gap Sagar Lake)", "Ward 2 (Shastri Marg)", "Ward 3 (Dungarpur Town)"]
+  },
+  {
+    "id": "ULB-JAR-NK-001",
+    "division": "Jaipur Division",
+    "district": "Jaipur",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Chomu",
+    "wards": ["Ward 1 (Bus Stand)", "Ward 2 (Fort View)", "Ward 3 (Thana Marg)"]
+  },
+  {
+    "id": "ULB-JOR-NK-001",
+    "division": "Jodhpur Division",
+    "district": "Jodhpur",
+    "ulbType": "Nagar Palika",
+    "ulbName": "Nagar Palika Bilara",
+    "wards": ["Ward 1 (Bilara Center)", "Ward 2 (Sojat Gate)", "Ward 3 (Main Bazar)"]
+  }
+]
