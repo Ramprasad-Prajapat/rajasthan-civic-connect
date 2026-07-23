@@ -573,14 +573,14 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
 
               {/* Portal tabs (hide when on register view or logged in) */}
               {!authenticatedUser && authView !== 'register' && (
-                <div className="d-flex p-1 bg-light rounded-3 mb-4 border" style={{ gap: '2px' }}>
-                  <button onClick={() => switchPortal('citizen')} className={`btn flex-fill py-2 rounded-3 fw-bold border-0 ${activePortal === 'citizen' ? 'bg-success text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.74rem' }}>
+                <div className="d-flex p-1 bg-light rounded-3 mb-4 border text-nowrap overflow-x-auto" style={{ gap: '2px' }}>
+                  <button onClick={() => switchPortal('citizen')} className={`btn flex-fill py-2 px-1 px-sm-2 rounded-3 fw-bold border-0 ${activePortal === 'citizen' ? 'bg-success text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.72rem', minHeight: '36px' }}>
                     🧑 Citizen
                   </button>
-                  <button onClick={() => switchPortal('department')} className={`btn flex-fill py-2 rounded-3 fw-bold border-0 ${activePortal === 'department' ? 'bg-primary text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.74rem' }}>
-                    🏢 Department
+                  <button onClick={() => switchPortal('department')} className={`btn flex-fill py-2 px-1 px-sm-2 rounded-3 fw-bold border-0 ${activePortal === 'department' ? 'bg-primary text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.72rem', minHeight: '36px' }}>
+                    🏢 Dept/Worker
                   </button>
-                  <button onClick={() => switchPortal('admin')} className={`btn flex-fill py-2 rounded-3 fw-bold border-0 ${activePortal === 'admin' ? 'bg-danger text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.74rem' }}>
+                  <button onClick={() => switchPortal('admin')} className={`btn flex-fill py-2 px-1 px-sm-2 rounded-3 fw-bold border-0 ${activePortal === 'admin' ? 'bg-danger text-white shadow-sm' : 'text-muted bg-transparent'}`} style={{ fontSize: '0.72rem', minHeight: '36px' }}>
                     🔑 Admin
                   </button>
                 </div>

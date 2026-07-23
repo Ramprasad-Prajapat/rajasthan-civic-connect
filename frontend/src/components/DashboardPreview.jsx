@@ -467,18 +467,56 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
       {/* ========================================================
           RIGHT OPERATIONS VIEWPORT (Main Panel)
           ======================================================== */}
-      <main className="flex-grow-1 p-3 p-md-4 d-flex flex-column gap-4 overflow-x-hidden">
+      <main className="flex-grow-1 p-2 p-sm-3 p-md-4 d-flex flex-column gap-3 gap-md-4 overflow-x-hidden">
         
+        {/* Mobile Dashboard Navigation Pill Bar (Visible only on < 992px) */}
+        <div className="d-lg-none bg-white rounded-4 shadow-sm p-2 border overflow-x-auto text-nowrap">
+          <div className="d-flex align-items-center gap-1.5">
+            {getSidebarItems().map(item => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  const complaintsTabs = ['my_complaints', 'assigned_tasks', 'assigned_complaints', 'complaints', 'completed_tasks', 'start_work', 'upload_proof'];
+                  if (complaintsTabs.includes(item.id)) {
+                    setActivePage('Complaints');
+                  } else if (item.id === 'submit') {
+                    setActivePage('Complaint');
+                  } else if (item.id === 'track') {
+                    setActivePage('Track Complaint');
+                  } else if (item.id === 'notifications') {
+                    setActivePage('Notifications');
+                  } else if (item.id === 'help') {
+                    setActivePage('Helpdesk');
+                  } else if (item.id === 'reports' || item.id === 'analytics') {
+                    setActivePage('Reports');
+                  } else if (item.id === 'settings') {
+                    setActivePage('Settings');
+                  } else if (item.id === 'users') {
+                    setActivePage('Users');
+                  } else {
+                    setActiveMenuTab(item.id);
+                  }
+                }}
+                className={`btn btn-sm rounded-pill px-3 py-1.5 d-inline-flex align-items-center gap-1.5 border-0 font-medium ${activeMenuTab === item.id ? 'bg-success text-white shadow-sm fw-bold' : 'btn-light text-secondary'}`}
+                style={{ fontSize: '0.76rem', minHeight: '36px' }}
+              >
+                <i className={`bi ${item.icon}`}></i>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Header Ribbon */}
-        <header className="card border-0 rounded-4 shadow-sm p-3.5 bg-white">
+        <header className="card border-0 rounded-4 shadow-sm p-3 p-sm-3.5 bg-white">
           <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div className="text-start">
-              <h4 className="fw-extrabold text-secondary m-0" style={{ fontSize: '1.25rem' }}>
+              <h4 className="fw-extrabold text-secondary m-0" style={{ fontSize: '1.15rem' }}>
                 {activeRole === 'super_admin' ? 'Super Administrator Portal' : activeRole === 'worker' ? 'Field Executive Portal' : activeRole === 'dept_officer' ? 'Department Command Console' : 'Citizen Dashboard Workspace'}
               </h4>
-              <div className="d-flex align-items-center gap-2 mt-0.5">
+              <div className="d-flex align-items-center gap-2 mt-0.5 flex-wrap">
                 <span className="badge bg-success-soft text-success rounded-pill font-monospace" style={{ fontSize: '0.62rem' }}>🟢 SECURE ACTIVE INDEX</span>
-                <span className="text-muted small" style={{ fontSize: '0.74rem' }}>Role Access Level: {activeRole.toUpperCase().replace('_', ' ')}</span>
+                <span className="text-muted small" style={{ fontSize: '0.74rem' }}>Role: {activeRole.toUpperCase().replace('_', ' ')}</span>
               </div>
             </div>
 
@@ -488,34 +526,34 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
                 className="btn btn-outline-success btn-sm rounded-pill px-3 py-1.5 fw-bold d-flex align-items-center gap-1.5"
                 style={{ fontSize: '0.74rem' }}
               >
-                <i className="bi bi-file-earmark-spreadsheet"></i> Export Excel
+                <i className="bi bi-file-earmark-spreadsheet"></i> <span className="d-none d-sm-inline">Export</span> Excel
               </button>
               <button
                 onClick={handleExportPDF}
                 className="btn btn-outline-danger btn-sm rounded-pill px-3 py-1.5 fw-bold d-flex align-items-center gap-1.5"
                 style={{ fontSize: '0.74rem' }}
               >
-                <i className="bi bi-file-earmark-pdf"></i> Export PDF
+                <i className="bi bi-file-earmark-pdf"></i> <span className="d-none d-sm-inline">Export</span> PDF
               </button>
             </div>
           </div>
         </header>
 
         {/* Global Filters Panel */}
-        <section className="card border-0 rounded-4 shadow-sm p-3.5 bg-white text-start">
+        <section className="card border-0 rounded-4 shadow-sm p-3 p-sm-3.5 bg-white text-start">
           <div className="d-flex align-items-center gap-2 mb-3">
             <i className="bi bi-funnel-fill text-success fs-5"></i>
             <strong className="text-secondary" style={{ fontSize: '0.9rem' }}>Real-time Operations Filters</strong>
           </div>
           <div className="row g-2.5">
-            <div className="col-md-2.4 col-sm-6">
+            <div className="col-6 col-md-4 col-lg">
               <label className="text-muted d-block mb-1 text-xxs fw-bold" style={{ fontSize: '0.65rem' }}>DATE RANGE</label>
               <select className="form-select form-select-sm rounded-3 py-2 text-secondary" style={{ fontSize: '0.74rem' }} value={filterDateRange} onChange={e => setFilterDateRange(e.target.value)}>
                 <option value="all">All Dates</option>
                 <option value="today">Today Only</option>
               </select>
             </div>
-            <div className="col-md-2.4 col-sm-6">
+            <div className="col-6 col-md-4 col-lg">
               <label className="text-muted d-block mb-1 text-xxs fw-bold" style={{ fontSize: '0.65rem' }}>WARD SECTOR</label>
               <select className="form-select form-select-sm rounded-3 py-2 text-secondary" style={{ fontSize: '0.74rem' }} value={filterWard} onChange={e => setFilterWard(e.target.value)}>
                 <option value="all">All Wards</option>
@@ -524,7 +562,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
                 <option value="Ward No. 36">Ward No. 36</option>
               </select>
             </div>
-            <div className="col-md-2.4 col-sm-6">
+            <div className="col-6 col-md-4 col-lg">
               <label className="text-muted d-block mb-1 text-xxs fw-bold" style={{ fontSize: '0.65rem' }}>DEPARTMENT</label>
               <select className="form-select form-select-sm rounded-3 py-2 text-secondary" style={{ fontSize: '0.74rem' }} value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
                 <option value="all">All Depts</option>
@@ -539,7 +577,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
                 <option value="General Administration">General Administration</option>
               </select>
             </div>
-            <div className="col-md-2.4 col-sm-6">
+            <div className="col-6 col-md-4 col-lg">
               <label className="text-muted d-block mb-1 text-xxs fw-bold" style={{ fontSize: '0.65rem' }}>COMPLAINT CATEGORY</label>
               <select className="form-select form-select-sm rounded-3 py-2 text-secondary" style={{ fontSize: '0.74rem' }} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                 <option value="all">All Categories</option>
@@ -560,7 +598,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
                 <option value="Other">Other</option>
               </select>
             </div>
-            <div className="col-md-2.4 col-sm-6">
+            <div className="col-6 col-md-4 col-lg">
               <label className="text-muted d-block mb-1 text-xxs fw-bold" style={{ fontSize: '0.65rem' }}>STATUS</label>
               <select className="form-select form-select-sm rounded-3 py-2 text-secondary" style={{ fontSize: '0.74rem' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                 <option value="all">All Status</option>

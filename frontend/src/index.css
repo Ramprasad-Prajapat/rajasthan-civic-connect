@@ -896,7 +896,95 @@ h6 {
 
 @media (max-width: 576px) {
   .container {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
   }
 }
+
+/* ===============================
+   COMPREHENSIVE RESPONSIVE UTILITIES
+================================ */
+
+/* Global Horizontal Overflow Shield */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Responsive Table Scroll Container Enhancements */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+}
+
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(15, 76, 129, 0.2);
+  border-radius: 4px;
+}
+
+/* Modal Responsive Bounds */
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem) !important;
+  }
+  
+  .modal-content {
+    border-radius: 16px !important;
+    padding: 0.5rem !important;
+  }
+}
+
+/* Leaflet Map Responsive Container */
+.leaflet-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 14px;
+  z-index: 10 !important;
+}
+
+@media (max-width: 768px) {
+  .leaflet-container {
+    height: 280px !important;
+  }
+}
+
+/* Form & Input Mobile Optimization */
+@media (max-width: 768px) {
+  .rc-form-control,
+  .form-control,
+  .form-select {
+    font-size: 0.9rem !important;
+    padding: 0.65rem 0.9rem !important;
+  }
+
+  .btn {
+    font-size: 0.85rem;
+  }
+}
+
+/* Responsive Grid Padding & Card Bounds */
+.rc-card, .card {
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+/* Universal Media Query Fixes for Viewports: 320px, 375px, 390px, 414px */
+@media (max-width: 414px) {
+  h1, .fs-1 { font-size: 1.6rem !important; }
+  h2, .fs-2 { font-size: 1.35rem !important; }
+  h3, .fs-3 { font-size: 1.2rem !important; }
+  h4, .fs-4 { font-size: 1.1rem !important; }
+  h5, .fs-5 { font-size: 1.0rem !important; }
+
+  .btn-lg {
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.9rem !important;
+  }
+}

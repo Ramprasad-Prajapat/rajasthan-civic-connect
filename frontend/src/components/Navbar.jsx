@@ -103,35 +103,175 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
 
   return (
     <header className="fixed-top animate-fade-in shadow-sm">
-
-
       {/* Sticky Main Navbar */}
-      <nav className="navbar navbar-expand-lg rc-navbar py-3">
-        <div className="container">
+      <nav className="navbar navbar-expand-lg rc-navbar py-2 py-lg-3">
+        <div className="container px-2 px-sm-3">
           {/* Logo */}
           <a
-            className="navbar-brand d-flex align-items-center"
+            className="navbar-brand d-flex align-items-center me-auto me-lg-4"
             href="#home"
             style={{ cursor: 'pointer' }}
             onClick={(e) => {
               e.preventDefault();
               setActivePage('Home');
+              setMobileMenuOpen(false);
+              setProfileDropdownOpen(false);
             }}
           >
-            <Logo width={48} height={48} showText={true} />
+            <Logo width={40} height={40} showText={true} />
           </a>
 
-          {/* Mobile Toggle */}
-          <button
-            className="navbar-toggler border-0 shadow-none"
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-controls="navbarNav"
-            aria-expanded={mobileMenuOpen}
-            aria-label="Toggle navigation"
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
+          {/* Header Mobile Action Bar (Avatar + Toggler) */}
+          <div className="d-flex align-items-center gap-2 d-lg-none ms-auto">
+            {authenticatedUser && (
+              <div ref={dropdownRef} className="position-relative d-inline-block">
+                <button
+                  className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
+                  style={{ 
+                    width: '38px', 
+                    height: '38px', 
+                    overflow: 'hidden', 
+                    outline: 'none',
+                    boxShadow: profileDropdownOpen ? '0 0 0 3px rgba(16, 185, 129, 0.3)' : 'none'
+                  }}
+                  onClick={() => {
+                    setProfileDropdownOpen(!profileDropdownOpen);
+                  }}
+                  aria-label="User profile menu"
+                >
+                  {authenticatedUser.photoURL ? (
+                    <img 
+                      src={authenticatedUser.photoURL} 
+                      alt={authenticatedUser.displayName || authenticatedUser.name} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="w-100 h-100 d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" 
+                      style={{ 
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                        fontSize: '1rem',
+                        borderRadius: '50%'
+                      }}
+                    >
+                      {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </button>
+
+                {/* Mobile Header Profile Dropdown */}
+                {profileDropdownOpen && (
+                  <div 
+                    className="position-absolute bg-white rounded-4 shadow-lg p-3 border animate-fade-in text-center d-flex flex-column gap-2 animate-scale-up" 
+                    style={{ 
+                      width: '280px', 
+                      maxWidth: 'calc(100vw - 24px)',
+                      top: 'calc(100% + 8px)', 
+                      right: '0', 
+                      zIndex: 1055, 
+                      boxShadow: '0 15px 35px rgba(0,0,0,0.18)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      borderRadius: '16px',
+                      maxHeight: 'calc(100vh - 90px)',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    <div className="d-flex flex-column align-items-center border-bottom pb-2.5 mb-1.5">
+                      {authenticatedUser.photoURL ? (
+                        <img 
+                          src={authenticatedUser.photoURL} 
+                          alt={authenticatedUser.displayName || authenticatedUser.name} 
+                          className="rounded-circle shadow-sm mb-2"
+                          style={{ width: '56px', height: '56px', objectFit: 'cover', border: '3px solid #10b981' }}
+                        />
+                      ) : (
+                        <div 
+                          className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm mb-2" 
+                          style={{ 
+                            width: '56px', 
+                            height: '56px', 
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                            fontSize: '1.4rem' 
+                          }}
+                        >
+                          {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      
+                      <strong className="text-secondary d-block fs-6 mb-0.5 text-truncate w-100" style={{ maxWidth: '240px' }}>
+                        {authenticatedUser.displayName || authenticatedUser.name}
+                      </strong>
+                      <span className="text-muted d-block small text-truncate mb-2" style={{ fontSize: '0.74rem', maxWidth: '240px' }}>
+                        {authenticatedUser.email}
+                      </span>
+
+                      <span 
+                        className="badge rounded-pill fw-bold px-3 py-1.5 border" 
+                        style={{ 
+                          fontSize: '0.68rem',
+                          letterSpacing: '0.03em',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+                          backgroundColor: getRoleBadge().style.backgroundColor,
+                          color: getRoleBadge().style.color,
+                          borderColor: getRoleBadge().style.borderColor
+                        }}
+                      >
+                        {getRoleBadge().label}
+                      </span>
+                    </div>
+
+                    <div className="d-flex flex-column gap-1 text-start">
+                      {getDropdownOptions().map((opt, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setActivePage(opt.page);
+                            setProfileDropdownOpen(false);
+                            setMobileMenuOpen(false);
+                          }}
+                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all"
+                          style={{ fontSize: '0.82rem', fontWeight: 550, minHeight: '44px' }}
+                        >
+                          <i className={`bi ${opt.icon} text-success fs-6`}></i>
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+
+                      <hr className="my-1 opacity-10" />
+
+                      <button
+                        onClick={() => {
+                          if (handleSignOut) handleSignOut();
+                          setProfileDropdownOpen(false);
+                          setMobileMenuOpen(false);
+                        }}
+                        className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100"
+                        style={{ fontSize: '0.85rem', fontWeight: 600, minHeight: '44px' }}
+                      >
+                        <i className="bi bi-box-arrow-right text-danger fs-5 me-1"></i>
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mobile Toggler Button */}
+            <button
+              className="navbar-toggler border-0 shadow-none p-1"
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-controls="navbarNav"
+              aria-expanded={mobileMenuOpen}
+              aria-label="Toggle navigation"
+            >
+              <span className="navbar-toggler-icon"></span>
+            </button>
+          </div>
 
           {/* Menu Items */}
           <div className={`collapse navbar-collapse ${mobileMenuOpen ? 'show' : ''}`} id="navbarNav">
@@ -140,13 +280,13 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                 if (item === 'Reports') {
                   return (
                     <li
-                      className="nav-item position-relative"
+                      className="nav-item position-relative w-100 w-lg-auto"
                       key={item}
-                      onMouseEnter={() => setReportsDropdownOpen(true)}
-                      onMouseLeave={() => setReportsDropdownOpen(false)}
+                      onMouseEnter={() => window.innerWidth >= 992 && setReportsDropdownOpen(true)}
+                      onMouseLeave={() => window.innerWidth >= 992 && setReportsDropdownOpen(false)}
                     >
                       <a
-                        className={`nav-link rc-nav-link d-flex align-items-center gap-1 dropdown-toggle ${activePage === 'Reports' ? 'active fw-semibold' : ''}`}
+                        className={`nav-link rc-nav-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1 dropdown-toggle ${activePage === 'Reports' ? 'active fw-semibold' : ''}`}
                         href="#reports"
                         style={{ cursor: 'pointer' }}
                         onClick={(e) => {
@@ -157,17 +297,18 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                         Reports
                       </a>
 
-                      {/* Interactive Dropdown Box */}
+                      {/* Reports Dropdown Box */}
                       {reportsDropdownOpen && (
                         <div
-                          className="position-absolute bg-white rounded-3 shadow-lg p-2 border animate-fade-in text-start d-flex flex-column gap-1"
+                          className="position-absolute-lg bg-white rounded-3 shadow-lg p-2 border animate-fade-in text-start d-flex flex-column gap-1"
                           style={{
-                            width: '260px',
-                            top: '100%',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
+                            width: window.innerWidth < 992 ? '100%' : '260px',
+                            maxWidth: 'calc(100vw - 32px)',
+                            top: window.innerWidth < 992 ? '100%' : '100%',
+                            left: window.innerWidth < 992 ? '0' : '50%',
+                            transform: window.innerWidth < 992 ? 'none' : 'translateX(-50%)',
                             zIndex: 1040,
-                            maxHeight: '400px',
+                            maxHeight: '340px',
                             overflowY: 'auto',
                             boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
                           }}
@@ -185,7 +326,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                                 setMobileMenuOpen(false);
                               }}
                               className="btn btn-sm text-start hover-light px-2.5 py-2 rounded-2 d-flex align-items-center gap-2 border-0 bg-transparent text-secondary"
-                              style={{ fontSize: '0.78rem' }}
+                              style={{ fontSize: '0.8rem', minHeight: '40px' }}
                             >
                               <i className={`bi ${subItem.icon} ${subItem.color} fs-6`}></i>
                               <span>{subItem.label}</span>
@@ -201,7 +342,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                 const targetPage = item === 'Helpdesk Support' ? 'Helpdesk' : item;
 
                 return (
-                  <li className="nav-item" key={item}>
+                  <li className="nav-item w-100 w-lg-auto" key={item}>
                     <a
                       className={`nav-link rc-nav-link ${isActive ? 'active fw-semibold' : ''}`}
                       href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
@@ -210,6 +351,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                         e.preventDefault();
                         setActivePage(targetPage);
                         setMobileMenuOpen(false);
+                        setProfileDropdownOpen(false);
                       }}
                     >
                       {item}
@@ -219,12 +361,11 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
               })}
             </ul>
 
-            {/* CTA Buttons */}
+            {/* Desktop CTA & Profile Button */}
             <div className="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3 mt-lg-0">
               {authenticatedUser ? (
                 <div 
-                  ref={dropdownRef}
-                  className="position-relative d-inline-block"
+                  className="d-none d-lg-inline-block position-relative"
                 >
                   <button
                     className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
@@ -263,7 +404,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                     )}
                   </button>
 
-                  {/* Dynamic Premium Dropdown */}
+                  {/* Desktop Dropdown Box */}
                   {profileDropdownOpen && (
                     <div 
                       className="position-absolute bg-white rounded-4 shadow-lg p-3 border animate-fade-in text-center d-flex flex-column gap-2 animate-scale-up" 
@@ -277,7 +418,6 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                         borderRadius: '16px'
                       }}
                     >
-                      {/* Profile Section Directly Inside Dropdown */}
                       <div className="d-flex flex-column align-items-center border-bottom pb-3 mb-2">
                         {authenticatedUser.photoURL ? (
                           <img 
@@ -300,14 +440,13 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                           </div>
                         )}
                         
-                        <strong className="text-secondary d-block fs-6 mb-0.5 text-truncate" style={{ maxWidth: '240px' }}>
+                        <strong className="text-secondary d-block fs-6 mb-0.5 text-truncate w-100" style={{ maxWidth: '240px' }}>
                           {authenticatedUser.displayName || authenticatedUser.name}
                         </strong>
                         <span className="text-muted d-block small text-truncate mb-2.5" style={{ fontSize: '0.74rem', maxWidth: '240px' }}>
                           {authenticatedUser.email}
                         </span>
 
-                        {/* Custom Badge styling based on getRoleBadge */}
                         <span 
                           className="badge rounded-pill fw-bold px-3 py-1.5 border" 
                           style={{ 
@@ -323,7 +462,6 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                         </span>
                       </div>
 
-                      {/* Dropdown Options based on Role */}
                       <div className="d-flex flex-column gap-1.5 text-start">
                         {getDropdownOptions().map((opt, idx) => (
                           <button
@@ -334,7 +472,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                               setMobileMenuOpen(false);
                             }}
                             className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all"
-                            style={{ fontSize: '0.8rem', fontWeight: 550 }}
+                            style={{ fontSize: '0.8rem', fontWeight: 550, minHeight: '40px' }}
                           >
                             <i className={`bi ${opt.icon} text-success fs-6`}></i>
                             <span>{opt.label}</span>
@@ -349,10 +487,10 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                             setProfileDropdownOpen(false);
                             setMobileMenuOpen(false);
                           }}
-                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all"
-                          style={{ fontSize: '0.8rem', fontWeight: 600 }}
+                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100"
+                          style={{ fontSize: '0.82rem', fontWeight: 600, minHeight: '40px' }}
                         >
-                          <i className="bi bi-box-arrow-right text-danger fs-6"></i>
+                          <i className="bi bi-box-arrow-right text-danger fs-6 me-1"></i>
                           <span>Sign Out</span>
                         </button>
                       </div>
@@ -365,6 +503,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                   onClick={() => {
                     setActivePage('Login/Register');
                     setMobileMenuOpen(false);
+                    setProfileDropdownOpen(false);
                   }}
                 >
                   <i className="bi bi-person-plus-fill me-1"></i> Login/Register
@@ -375,5 +514,6 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
         </div>
       </nav>
     </header>
+
   );
 }

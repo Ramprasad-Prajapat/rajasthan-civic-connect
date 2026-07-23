@@ -92,7 +92,7 @@ export default function MapPicker({
       <MapContainer
         center={center}
         zoom={zoom}
-        scrollWheelZoom={true}
+        scrollWheelZoom={false}
         style={{ height: '100%', width: '100%', borderRadius: '0.75rem' }}
       >
         <TileLayer
@@ -112,7 +112,7 @@ export default function MapPicker({
       {/* Map Attribution Overlay */}
       <div 
         className="position-absolute bottom-0 start-0 w-100 p-2 d-flex justify-content-between align-items-center" 
-        style={{ zIndex: 1000, background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}
+        style={{ zIndex: 500, background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}
       >
         <span className="badge bg-dark bg-opacity-75 text-white border border-white border-opacity-10 py-1 px-2" style={{ fontSize: '0.58rem' }}>
           <i className="bi bi-map-fill me-1"></i> OpenStreetMap

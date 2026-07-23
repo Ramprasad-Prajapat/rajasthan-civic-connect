@@ -203,13 +203,13 @@ export default function MyComplaints({ authenticatedUser, setActivePage }) {
             </div>
 
             {/* Filter Tabs */}
-            <div className="d-flex bg-light p-1 rounded-pill border">
+            <div className="d-flex bg-light p-1 rounded-pill border overflow-x-auto text-nowrap w-100 w-md-auto justify-content-start justify-content-md-center">
               {['All', 'Pending', 'Assigned', 'Resolved'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveFilterTab(tab)}
                   className={`btn btn-sm rounded-pill px-3.5 py-1.5 fw-bold border-0 ${activeFilterTab === tab ? 'bg-success text-white shadow-sm' : 'text-muted bg-transparent'}`}
-                  style={{ fontSize: '0.76rem' }}
+                  style={{ fontSize: '0.76rem', minHeight: '36px' }}
                 >
                   {tab}
                 </button>
