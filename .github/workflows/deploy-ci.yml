@@ -1,0 +1,40 @@
+name: RajCivic Connect Production Deployment Pipeline Verification
+
+on:
+  push:
+    branches: [ main, feature/next-phase ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  production-verify:
+    name: Production Deployment Pipeline Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci || npm install
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci || npm install
+
+      - name: Run Production Infrastructure Smoke Test
+        run: node verify_production_smoke.mjs
+
+      - name: Build Production Bundle (npm run build)
+        run: |
+          cd frontend
+          npm run build

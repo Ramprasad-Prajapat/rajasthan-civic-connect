@@ -19,18 +19,18 @@ async function fileToBase64(file) {
  * Helper to fetch authorization header.
  */
 async function getAuthHeader() {
-  const customToken = localStorage.getItem('rajcivic_token');
-  if (customToken) {
-    return { 'Authorization': `Bearer ${customToken}` };
-  }
   const currentUser = auth?.currentUser;
   if (currentUser) {
     try {
-      const idToken = await currentUser.getIdToken(true);
+      const idToken = await currentUser.getIdToken();
       return { 'Authorization': `Bearer ${idToken}` };
     } catch (e) {
       console.error("Failed to acquire ID Token:", e);
     }
+  }
+  const firebaseIdToken = localStorage.getItem('firebaseIdToken');
+  if (firebaseIdToken) {
+    return { 'Authorization': `Bearer ${firebaseIdToken}` };
   }
   return {};
 }
@@ -50,9 +50,6 @@ export async function loginUser(email, password, portal) {
     throw new Error(errorData.error || "Failed to log in");
   }
   const data = await response.json();
-  if (data.token) {
-    localStorage.setItem('rajcivic_token', data.token);
-  }
   return data.user;
 }
 
@@ -200,6 +197,7 @@ export async function createComplaint(complaintData, photoFile) {
       throw new Error(errorData.error || "Failed to create complaint");
     }
     const result = await response.json();
+    clearQueryCache();
     return result;
   } catch (error) {
     console.error("Failed to lodge complaint via API:", error);
@@ -280,17 +278,43 @@ export async function getComplaint(complaintId) {
   }
 }
 
+// Query Cache for Firestore & REST API optimization
+const queryCache = new Map();
+const CACHE_TTL_MS = 15000;
+
+function getCachedData(key) {
+  const cached = queryCache.get(key);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(key, data) {
+  queryCache.set(key, { timestamp: Date.now(), data });
+}
+
+export function clearQueryCache() {
+  queryCache.clear();
+}
+
 /**
  * Fetches only the logged-in citizen's complaints from the backend.
  */
 export async function getMyComplaints() {
   try {
+    const cacheKey = 'my_complaints';
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
     const headers = await getAuthHeader();
     const response = await fetch(`${API_BASE_URL}/complaints/my`, {
       headers
     });
     if (!response.ok) return [];
-    return await response.json();
+    const data = await response.json();
+    setCachedData(cacheKey, data);
+    return data;
   } catch (error) {
     console.error("Error fetching my complaints:", error);
     return [];
@@ -302,7 +326,6 @@ export async function getMyComplaints() {
  */
 export async function getComplaints(filters = {}) {
   try {
-    const headers = await getAuthHeader();
     const queryParams = new URLSearchParams();
     
     if (filters.citizenId) queryParams.append('citizenId', filters.citizenId);
@@ -312,11 +335,18 @@ export async function getComplaints(filters = {}) {
     if (filters.district && filters.district !== 'all') queryParams.append('district', filters.district);
     if (filters.department && filters.department !== 'all') queryParams.append('department', filters.department);
     
+    const cacheKey = `complaints_${queryParams.toString()}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
+    const headers = await getAuthHeader();
     const response = await fetch(`${API_BASE_URL}/complaints?${queryParams.toString()}`, {
       headers
     });
     if (!response.ok) return [];
-    return await response.json();
+    const data = await response.json();
+    setCachedData(cacheKey, data);
+    return data;
   } catch (error) {
     console.error("Error fetching complaints list:", error);
     return [];
@@ -348,7 +378,9 @@ export async function updateComplaintStatus(complaintId, status, remark, workerI
         })
       });
       if (!response.ok) throw new Error("Failed to assign worker");
-      return await response.json();
+      const resData = await response.json();
+      clearQueryCache();
+      return resData;
     } else {
       const response = await fetch(`${API_BASE_URL}/complaints/${complaintId}/status`, {
         method: 'PUT',
@@ -363,7 +395,9 @@ export async function updateComplaintStatus(complaintId, status, remark, workerI
         })
       });
       if (!response.ok) throw new Error("Failed to update status");
-      return await response.json();
+      const resData = await response.json();
+      clearQueryCache();
+      return resData;
     }
   } catch (error) {
     console.error("Failed to update complaint status:", error);

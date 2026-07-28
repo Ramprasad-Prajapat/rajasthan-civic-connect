@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role.toLowerCase() == role.toLowerCase();
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role.toLowerCase() == 'admin' ||
+        getUserData().role.toLowerCase() == 'super_admin' ||
+        getUserData().portal.toLowerCase() == 'admin'
+      );
+    }
+
+    function isOfficer() {
+      return isAuthenticated() && (
+        getUserData().role.toLowerCase().contains('officer') ||
+        getUserData().portal.toLowerCase() == 'department'
+      );
+    }
+
+    function isWorker() {
+      return isAuthenticated() && (
+        getUserData().role.toLowerCase().contains('worker') ||
+        getUserData().role.toLowerCase().contains('field')
+      );
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isOfficer() || isAdmin() || isWorker());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // 2. Complaints Collection
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated() && (
+        resource.data.citizenId == request.auth.uid ||
+        isOfficer() ||
+        isWorker() ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.citizenId == request.auth.uid ||
+        request.resource.data.citizenId != null
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.citizenId == request.auth.uid ||
+        resource.data.assignedWorker.name == getUserData().fullName ||
+        isOfficer() ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. Emergencies Collection
+    match /emergencies/{emergencyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isOfficer() || isAdmin();
+    }
+
+    // 4. Departments & Workers Directories
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /workers/{workerId} {
+      allow read: if isAuthenticated();
+      allow write: if isOfficer() || isAdmin();
+    }
+
+    // 5. Feedback & Ratings
+    match /feedback/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // 6. Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isOfficer() || isAdmin();
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // 7. Reports & System Settings
+    match /reports/{reportId} {
+      allow read: if isOfficer() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /systemSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

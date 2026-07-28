@@ -1,0 +1,54 @@
+name: RajCivic Connect Automated QA & Security Test CI
+
+on:
+  push:
+    branches: [ main, feature/next-phase ]
+  pull_request:
+    branches: [ main, feature/next-phase ]
+
+jobs:
+  test-and-build:
+    name: Execute Automated QA, Security & Build Matrix
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci || npm install
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci || npm install
+
+      - name: Run Phase 1 Security Verification
+        run: node verify_phase1.mjs
+
+      - name: Run Phase 2 Performance & Code-Splitting Verification
+        run: node verify_phase2.mjs
+
+      - name: Run Phase 3 Comprehensive Automated QA Verification
+        run: node verify_phase3.mjs
+
+      - name: Run Backend Authentication & API Unit Tests
+        run: |
+          node backend/tests/auth.test.js
+          node backend/tests/api.test.js
+
+      - name: Run Frontend Unit & Workflow Tests
+        run: node frontend/src/tests/complaintWorkflow.test.js
+
+      - name: Verify Frontend Production Build (npm run build)
+        run: |
+          cd frontend
+          npm run build

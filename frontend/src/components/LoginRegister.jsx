@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import Logo from './Logo';
 import { isFirebaseConfigured, auth, googleProvider } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { saveUserProfile, getUserProfile, loginUser, registerUser, verifyForgotDetails, resetPassword } from '../firestoreService';
 
-const TEMP_CREDENTIALS = {
+const IS_DEV = import.meta.env.DEV;
+
+const TEMP_CREDENTIALS = IS_DEV ? {
   citizen: { email: 'citizen@rajcivic.com', password: 'citizen123' },
   department: { email: 'department@rajcivic.com', password: 'dept123' },
   admin: { email: 'admin@rajcivic.com', password: 'admin123', authCode: '123456', mobile: '9009009009' },
+} : {
+  citizen: { email: 'citizen@rajasthan.gov.in', password: '••••••••' },
+  department: { email: 'officer@rajasthan.gov.in', password: '••••••••' },
+  admin: { email: 'admin@rajasthan.gov.in', password: '••••••••', authCode: '======', mobile: '9xxxxxxxxx' },
 };
 
 const GoogleSvg = () => (
@@ -229,9 +236,10 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
       try {
         if (isFirebaseConfigured && auth) {
           try {
-            const { createUserWithEmailAndPassword } = await import("firebase/auth");
-            const result = await createUserWithEmailAndPassword(auth, email, password);
-            const user = result.user;
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const idToken = await userCredential.user.getIdToken();
+            localStorage.setItem('firebaseIdToken', idToken);
+            const user = userCredential.user;
 
             const profileData = {
               fullName: name,
@@ -242,7 +250,6 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
               status: 'Active'
             };
             await saveUserProfile(user.uid, profileData);
-            await auth.signOut();
           } catch (fbErr) {
             console.warn("Firebase Auth registration failed or not supported, proceeding with DB registration...", fbErr);
           }
@@ -311,9 +318,10 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
         // Fallback to real Firebase Auth
         if (isFirebaseConfigured && auth) {
           try {
-            const { signInWithEmailAndPassword } = await import("firebase/auth");
-            const result = await signInWithEmailAndPassword(auth, email, password);
-            const user = result.user;
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const idToken = await userCredential.user.getIdToken();
+            localStorage.setItem('firebaseIdToken', idToken);
+            const user = userCredential.user;
 
             const profile = await getUserProfile(user.uid);
             const mockUser = {
@@ -344,6 +352,10 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
 
   // Sign out
   const handleSignOut = () => {
+    localStorage.removeItem('firebaseIdToken');
+    if (isFirebaseConfigured && auth) {
+      auth.signOut().catch(() => {});
+    }
     if (setAuthenticatedUser) setAuthenticatedUser(null);
     triggerAlert('success', 'Logged out successfully.');
   };
