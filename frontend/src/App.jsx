@@ -1,4 +1,6 @@
 import React, { useState, useRef, Suspense, lazy } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, isFirebaseConfigured } from './firebase';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import QuickAccess from './components/QuickAccess';
@@ -37,19 +39,70 @@ function App() {
   }, [activePage]);
   const [selectedReportTab, setSelectedReportTab] = useState('complaint_summary');
 
-  // Lifted user authentication state synced with localStorage
-  const [authenticatedUser, setAuthenticatedUser] = useState(() => {
-    const saved = localStorage.getItem('rajcivic_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // Auth view mode for Login/Register component ('login' | 'register')
+  const [authViewMode, setAuthViewMode] = useState('login');
+
+  // Lifted user authentication state MUST be initialized to null (NOT from localStorage)
+  const [authenticatedUser, setAuthenticatedUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const returnToRef = useRef(null);
+
+  // Synchronize authenticatedUser state with Firebase Authentication as source of truth
+  React.useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setAuthLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userUid = firebaseUser.uid || firebaseUser.email.replace(/[.#$[\]]/g, '_');
+        try {
+          const { getUserProfile } = await import('./firestoreService');
+          const profile = await getUserProfile(userUid);
+          const mergedUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: profile?.fullName || firebaseUser.displayName || 'Citizen User',
+            displayName: firebaseUser.displayName || profile?.fullName || 'Citizen User',
+            photoURL: firebaseUser.photoURL || profile?.photoURL || null,
+            portal: profile?.portal || 'citizen',
+            role: profile?.role || 'Citizen',
+            rtdbNode: `/${profile?.portal || 'citizen'}s/${firebaseUser.email.replace(/[.#$[\]]/g, '_')}`,
+            ...profile
+          };
+          setAuthenticatedUser(mergedUser);
+          localStorage.setItem('rajcivic_user', JSON.stringify(mergedUser));
+        } catch (err) {
+          const fallbackUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'Citizen User',
+            displayName: firebaseUser.displayName || 'Citizen User',
+            photoURL: firebaseUser.photoURL || null,
+            portal: 'citizen',
+            role: 'Citizen',
+            rtdbNode: `/citizens/${firebaseUser.email.replace(/[.#$[\]]/g, '_')}`
+          };
+          setAuthenticatedUser(fallbackUser);
+          localStorage.setItem('rajcivic_user', JSON.stringify(fallbackUser));
+        }
+      } else {
+        setAuthenticatedUser(null);
+        localStorage.removeItem('rajcivic_user');
+        localStorage.removeItem('firebaseIdToken');
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleSetAuthenticatedUser = (user) => {
     setAuthenticatedUser(user);
     if (user) {
       localStorage.setItem('rajcivic_user', JSON.stringify(user));
-      // Return to saved page after login
       if (returnToRef.current) {
         const dest = returnToRef.current;
         returnToRef.current = null;
@@ -61,7 +114,14 @@ function App() {
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try {
+      if (isFirebaseConfigured && auth) {
+        await signOut(auth);
+      }
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     handleSetAuthenticatedUser(null);
     setActivePage('Home');
   };
@@ -110,6 +170,7 @@ function App() {
         setSelectedReportTab={setSelectedReportTab}
         authenticatedUser={authenticatedUser}
         handleSignOut={handleSignOut}
+        setAuthViewMode={setAuthViewMode}
       />
 
       {/* Main Content Area with Suspense Code Splitting */}
@@ -148,6 +209,7 @@ function App() {
                 authenticatedUser={authenticatedUser}
                 setAuthenticatedUser={handleSetAuthenticatedUser}
                 setActivePage={setActivePage}
+                handleSignOut={handleSignOut}
               />
             </div>
           )}
@@ -285,6 +347,9 @@ function App() {
                 authenticatedUser={authenticatedUser}
                 setAuthenticatedUser={handleSetAuthenticatedUser}
                 setActivePage={setActivePage}
+                authViewMode={authViewMode}
+                setAuthViewMode={setAuthViewMode}
+                handleSignOut={handleSignOut}
               />
             </div>
           )}

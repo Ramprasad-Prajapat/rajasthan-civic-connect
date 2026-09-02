@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Logo from './Logo';
 
-export default function Navbar({ activePage, setActivePage, setSelectedReportTab, authenticatedUser, handleSignOut }) {
+export default function Navbar({ activePage, setActivePage, setSelectedReportTab, authenticatedUser, handleSignOut, setAuthViewMode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
-  const dropdownRef = useRef(null);
+  const mobileProfileDropdownRef = useRef(null);
+  const desktopProfileDropdownRef = useRef(null);
+  const reportsDropdownRef = useRef(null);
 
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      const isMobileProfileClick = mobileProfileDropdownRef.current && mobileProfileDropdownRef.current.contains(event.target);
+      const isDesktopProfileClick = desktopProfileDropdownRef.current && desktopProfileDropdownRef.current.contains(event.target);
+      if (!isMobileProfileClick && !isDesktopProfileClick) {
         setProfileDropdownOpen(false);
+      }
+
+      if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(event.target)) {
+        setReportsDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -22,11 +30,12 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
   }, []);
 
   const menuItems = [
-    'Home',
-    'Complaint',
-    'Track Complaint',
-    'Reports',
-    'Helpdesk Support'
+    { name: 'Home', icon: 'bi-house-door-fill' },
+    { name: 'Complaint', icon: 'bi-pencil-square' },
+    { name: 'Track Complaint', icon: 'bi-geo-alt-fill' },
+    { name: 'Reports', icon: 'bi-bar-chart-line-fill' },
+    { name: 'Helpdesk', icon: 'bi-headset' },
+    { name: 'Emergency', icon: 'bi-lightning-charge-fill', isEmergency: true }
   ];
 
   const getRoleBadge = () => {
@@ -124,7 +133,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
           {/* Header Mobile Action Bar (Avatar + Toggler) */}
           <div className="d-flex align-items-center gap-2 d-lg-none ms-auto">
             {authenticatedUser && (
-              <div ref={dropdownRef} className="position-relative d-inline-block">
+              <div ref={mobileProfileDropdownRef} className="position-relative d-inline-block">
                 <button
                   className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
                   style={{ 
@@ -232,7 +241,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                             setProfileDropdownOpen(false);
                             setMobileMenuOpen(false);
                           }}
-                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all"
+                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all w-100 shadow-none"
                           style={{ fontSize: '0.82rem', fontWeight: 550, minHeight: '44px' }}
                         >
                           <i className={`bi ${opt.icon} text-success fs-6`}></i>
@@ -248,7 +257,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                           setProfileDropdownOpen(false);
                           setMobileMenuOpen(false);
                         }}
-                        className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100"
+                        className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100 shadow-none"
                         style={{ fontSize: '0.85rem', fontWeight: 600, minHeight: '44px' }}
                       >
                         <i className="bi bi-box-arrow-right text-danger fs-5 me-1"></i>
@@ -273,99 +282,109 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
             </button>
           </div>
 
-          {/* Menu Items */}
+          {/* Menu Items encapsulated in single circular border pill container */}
           <div className={`collapse navbar-collapse ${mobileMenuOpen ? 'show' : ''}`} id="navbarNav">
-            <ul className="navbar-nav mx-auto mb-2 mb-lg-0 mt-3 mt-lg-0 gap-1 text-center align-items-center">
-              {menuItems.map((item) => {
-                if (item === 'Reports') {
-                  return (
-                    <li
-                      className="nav-item position-relative w-100 w-lg-auto"
-                      key={item}
-                      onMouseEnter={() => window.innerWidth >= 992 && setReportsDropdownOpen(true)}
-                      onMouseLeave={() => window.innerWidth >= 992 && setReportsDropdownOpen(false)}
-                    >
-                      <a
-                        className={`nav-link rc-nav-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1 dropdown-toggle ${activePage === 'Reports' ? 'active fw-semibold' : ''}`}
-                        href="#reports"
-                        style={{ cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setReportsDropdownOpen(!reportsDropdownOpen);
-                        }}
-                      >
-                        Reports
-                      </a>
+            <div className="mx-auto my-2 my-lg-0 px-lg-2">
+              <div className="rc-nav-pill-wrapper d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center flex-nowrap p-1.5 p-lg-1 bg-white bg-opacity-90 rounded-4 rounded-lg-pill border border-light-subtle shadow-sm">
+                <ul className="navbar-nav d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center flex-nowrap m-0 p-0 gap-1 gap-lg-1 w-100 list-unstyled">
+                  {menuItems.map((item) => {
+                    const itemName = typeof item === 'string' ? item : item.name;
+                    const itemIcon = typeof item === 'string' ? null : item.icon;
+                    const isEmergency = item.isEmergency;
+                    const isActive = activePage === itemName;
 
-                      {/* Reports Dropdown Box */}
-                      {reportsDropdownOpen && (
-                        <div
-                          className="position-absolute-lg bg-white rounded-3 shadow-lg p-2 border animate-fade-in text-start d-flex flex-column gap-1"
-                          style={{
-                            width: window.innerWidth < 992 ? '100%' : '260px',
-                            maxWidth: 'calc(100vw - 32px)',
-                            top: window.innerWidth < 992 ? '100%' : '100%',
-                            left: window.innerWidth < 992 ? '0' : '50%',
-                            transform: window.innerWidth < 992 ? 'none' : 'translateX(-50%)',
-                            zIndex: 1040,
-                            maxHeight: '340px',
-                            overflowY: 'auto',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                    if (itemName === 'Reports') {
+                      return (
+                        <li
+                          ref={reportsDropdownRef}
+                          className="nav-item position-relative"
+                          key={itemName}
+                          onMouseEnter={() => window.innerWidth >= 992 && setReportsDropdownOpen(true)}
+                          onMouseLeave={() => window.innerWidth >= 992 && setReportsDropdownOpen(false)}
+                        >
+                          <a
+                            className={`nav-link rc-nav-pill-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1.5 dropdown-toggle ${isActive ? 'active' : ''}`}
+                            href="#reports"
+                            style={{ cursor: 'pointer' }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setReportsDropdownOpen(!reportsDropdownOpen);
+                            }}
+                          >
+                            {itemIcon && <i className={`bi ${itemIcon} rc-pill-icon`}></i>}
+                            <span>Reports</span>
+                          </a>
+
+                          {/* Reports Dropdown Box */}
+                          {reportsDropdownOpen && (
+                            <div
+                              className="position-absolute bg-white rounded-4 shadow-lg p-2 border animate-fade-in text-start d-flex flex-column gap-1"
+                              style={{
+                                width: window.innerWidth < 992 ? '100%' : '260px',
+                                maxWidth: 'calc(100vw - 32px)',
+                                top: 'calc(100% + 8px)',
+                                left: window.innerWidth < 992 ? '0' : '50%',
+                                transform: window.innerWidth < 992 ? 'none' : 'translateX(-50%)',
+                                zIndex: 1050,
+                                maxHeight: '340px',
+                                overflowY: 'auto',
+                                boxShadow: '0 12px 30px rgba(0,0,0,0.12)'
+                              }}
+                            >
+                              <span className="text-muted text-uppercase fw-extrabold d-block mb-1.5 px-2.5 pt-1.5" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>
+                                Municipal Ledgers
+                              </span>
+                              {reportDropdownItems.map((subItem) => (
+                                <button
+                                  key={subItem.id}
+                                  onClick={() => {
+                                    setSelectedReportTab(subItem.id);
+                                    setActivePage('Reports');
+                                    setReportsDropdownOpen(false);
+                                    setMobileMenuOpen(false);
+                                  }}
+                                  className="btn btn-sm text-start hover-light px-2.5 py-2 rounded-2 d-flex align-items-center gap-2 border-0 bg-transparent text-secondary w-100 shadow-none"
+                                  style={{ fontSize: '0.8rem', minHeight: '40px' }}
+                                >
+                                  <i className={`bi ${subItem.icon} ${subItem.color} fs-6`}></i>
+                                  <span>{subItem.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li className="nav-item" key={itemName}>
+                        <a
+                          className={`nav-link rc-nav-pill-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1.5 ${isActive ? 'active' : ''} ${isEmergency && !isActive ? 'rc-emergency-pill' : ''}`}
+                          href={`#${itemName.toLowerCase().replace(/\s+/g, '-')}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setActivePage(itemName);
+                            setMobileMenuOpen(false);
+                            setProfileDropdownOpen(false);
                           }}
                         >
-                          <span className="text-muted text-uppercase fw-extrabold d-block mb-1.5 px-2.5 pt-1.5" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>
-                            Municipal Ledgers
-                          </span>
-                          {reportDropdownItems.map((subItem) => (
-                            <button
-                              key={subItem.id}
-                              onClick={() => {
-                                setSelectedReportTab(subItem.id);
-                                setActivePage('Reports');
-                                setReportsDropdownOpen(false);
-                                setMobileMenuOpen(false);
-                              }}
-                              className="btn btn-sm text-start hover-light px-2.5 py-2 rounded-2 d-flex align-items-center gap-2 border-0 bg-transparent text-secondary"
-                              style={{ fontSize: '0.8rem', minHeight: '40px' }}
-                            >
-                              <i className={`bi ${subItem.icon} ${subItem.color} fs-6`}></i>
-                              <span>{subItem.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </li>
-                  );
-                }
-
-                const isActive = (item === 'Helpdesk Support' && activePage === 'Helpdesk') || (activePage === item);
-                const targetPage = item === 'Helpdesk Support' ? 'Helpdesk' : item;
-
-                return (
-                  <li className="nav-item w-100 w-lg-auto" key={item}>
-                    <a
-                      className={`nav-link rc-nav-link ${isActive ? 'active fw-semibold' : ''}`}
-                      href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-                      style={{ cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActivePage(targetPage);
-                        setMobileMenuOpen(false);
-                        setProfileDropdownOpen(false);
-                      }}
-                    >
-                      {item}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+                          {itemIcon && <i className={`bi ${itemIcon} rc-pill-icon`}></i>}
+                          <span>{itemName}</span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
 
             {/* Desktop CTA & Profile Button */}
             <div className="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3 mt-lg-0">
               {authenticatedUser ? (
                 <div 
-                  className="d-none d-lg-inline-block position-relative"
+                  ref={desktopProfileDropdownRef}
+                  className="d-inline-block position-relative"
                 >
                   <button
                     className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
@@ -410,12 +429,15 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                       className="position-absolute bg-white rounded-4 shadow-lg p-3 border animate-fade-in text-center d-flex flex-column gap-2 animate-scale-up" 
                       style={{ 
                         width: '280px', 
+                        maxWidth: 'calc(100vw - 24px)',
                         top: 'calc(100% + 8px)', 
                         right: '0', 
-                        zIndex: 1045, 
-                        boxShadow: '0 15px 35px rgba(0,0,0,0.12)',
+                        zIndex: 1055, 
+                        boxShadow: '0 15px 35px rgba(0,0,0,0.18)',
                         border: '1px solid rgba(0,0,0,0.08)',
-                        borderRadius: '16px'
+                        borderRadius: '16px',
+                        maxHeight: 'calc(100vh - 90px)',
+                        overflowY: 'auto'
                       }}
                     >
                       <div className="d-flex flex-column align-items-center border-bottom pb-3 mb-2">
@@ -471,7 +493,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                               setProfileDropdownOpen(false);
                               setMobileMenuOpen(false);
                             }}
-                            className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all"
+                            className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all w-100 shadow-none"
                             style={{ fontSize: '0.8rem', fontWeight: 550, minHeight: '40px' }}
                           >
                             <i className={`bi ${opt.icon} text-success fs-6`}></i>
@@ -487,7 +509,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                             setProfileDropdownOpen(false);
                             setMobileMenuOpen(false);
                           }}
-                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100"
+                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100 shadow-none"
                           style={{ fontSize: '0.82rem', fontWeight: 600, minHeight: '40px' }}
                         >
                           <i className="bi bi-box-arrow-right text-danger fs-6 me-1"></i>
@@ -499,14 +521,15 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
                 </div>
               ) : (
                 <button
-                  className={`btn btn-sm rc-nav-btn rounded-pill px-3 py-2 ${activePage === 'Login/Register' ? 'active' : ''}`}
+                  className={`btn btn-sm btn-success rounded-pill px-3.5 py-1.5 fw-semibold text-white ${activePage === 'Login/Register' ? 'active' : ''}`}
                   onClick={() => {
+                    if (setAuthViewMode) setAuthViewMode('login');
                     setActivePage('Login/Register');
                     setMobileMenuOpen(false);
                     setProfileDropdownOpen(false);
                   }}
                 >
-                  <i className="bi bi-person-plus-fill me-1"></i> Login/Register
+                  <i className="bi bi-box-arrow-in-right me-1"></i> Login
                 </button>
               )}
             </div>

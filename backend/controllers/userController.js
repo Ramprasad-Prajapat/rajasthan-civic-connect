@@ -27,14 +27,20 @@ export const getUsers = async (req, res) => {
 export const getUserById = async (req, res) => {
   const { id } = req.params;
   const uid = req.user.uid || req.user.email;
+  const sanitizedReqUid = (uid || '').replace(/[.#$@\[\]{}]/g, '_');
+  const sanitizedTargetId = (id || '').replace(/[.#$@\[\]{}]/g, '_');
   const userRole = (req.user.role || '').toUpperCase();
+  const isAdmin = userRole === 'SUPER ADMIN' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
   
-  if (userRole !== 'SUPER ADMIN' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && uid !== id) {
+  if (!isAdmin && uid !== id && sanitizedReqUid !== sanitizedTargetId) {
     return res.status(403).json({ error: "Access forbidden: cannot view another user profile" });
   }
   
   try {
-    const snap = await db.collection('users').doc(id).get();
+    let snap = await db.collection('users').doc(id).get();
+    if (!snap.exists && sanitizedTargetId !== id) {
+      snap = await db.collection('users').doc(sanitizedTargetId).get();
+    }
     if (!snap.exists) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -50,9 +56,12 @@ export const getUserById = async (req, res) => {
 export const updateUser = async (req, res) => {
   const { id } = req.params;
   const uid = req.user.uid || req.user.email;
+  const sanitizedReqUid = (uid || '').replace(/[.#$@\[\]{}]/g, '_');
+  const sanitizedTargetId = (id || '').replace(/[.#$@\[\]{}]/g, '_');
   const userRole = (req.user.role || '').toUpperCase();
+  const isAdmin = userRole === 'SUPER ADMIN' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
   
-  if (userRole !== 'SUPER ADMIN' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && uid !== id) {
+  if (!isAdmin && uid !== id && sanitizedReqUid !== sanitizedTargetId) {
     return res.status(403).json({ error: "Access forbidden: cannot edit another user profile" });
   }
   

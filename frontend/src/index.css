@@ -95,6 +95,78 @@ h6 {
   transition: var(--transition-smooth);
 }
 
+/* Custom Single-Border Circular Pill Navigation Bar */
+.rc-nav-pill-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(16, 185, 129, 0.22) !important;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: var(--transition-smooth);
+}
+
+.rc-nav-pill-wrapper:hover {
+  border-color: rgba(16, 185, 129, 0.45) !important;
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.14);
+}
+
+@media (min-width: 992px) {
+  .rc-nav-pill-wrapper {
+    border-radius: 9999px !important;
+    white-space: nowrap !important;
+  }
+}
+
+.rc-nav-pill-link {
+  font-size: 0.84rem !important;
+  font-weight: 550 !important;
+  color: #475569 !important;
+  padding: 0.48rem 0.95rem !important;
+  border-radius: 9999px !important;
+  white-space: nowrap !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-decoration: none !important;
+}
+
+.rc-nav-pill-link .rc-pill-icon {
+  font-size: 0.92rem;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+}
+
+.rc-nav-pill-link:hover:not(.active) {
+  color: #0f4c81 !important;
+  background-color: rgba(16, 185, 129, 0.09) !important;
+}
+
+.rc-nav-pill-link:hover:not(.active) .rc-pill-icon {
+  opacity: 1;
+  color: #10b981;
+  transform: translateY(-1px);
+}
+
+.rc-nav-pill-link.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  font-weight: 650 !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+.rc-nav-pill-link.active .rc-pill-icon {
+  opacity: 1;
+  color: #ffffff !important;
+}
+
+.rc-emergency-pill {
+  color: #dc2626 !important;
+}
+
+.rc-emergency-pill:hover {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+
+.rc-emergency-pill .rc-pill-icon {
+  color: #ef4444;
+}
+
 .rc-nav-link {
   font-weight: 500;
   color: var(--rc-muted) !important;
@@ -825,9 +897,16 @@ h6 {
   cursor: pointer !important;
 }
 
-.hover-light:hover {
-  background-color: rgba(241, 245, 249, 0.6) !important;
-  transition: var(--transition-smooth);
+.hover-light {
+  transition: all 0.2s ease-in-out !important;
+  cursor: pointer;
+}
+
+.hover-light:hover,
+.hover-light:focus,
+.hover-light:active {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 .hover-lift {

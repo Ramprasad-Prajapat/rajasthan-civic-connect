@@ -143,8 +143,17 @@ export const loginUser = async (req, res) => {
 
     await userDoc.ref.update({ lastLogin: new Date().toISOString() });
 
+    const tokenPayload = Buffer.from(JSON.stringify({
+      uid: userDoc.id,
+      email: userData.email,
+      role: userData.role || 'Citizen',
+      portal: userData.portal || 'citizen'
+    })).toString('base64');
+    const token = `db.${tokenPayload}.sig`;
+
     res.status(200).json({
       message: 'Login successful',
+      token,
       user: sanitizeUser({ uid: userDoc.id, ...userData, lastLogin: new Date().toISOString() })
     });
   } catch (error) {

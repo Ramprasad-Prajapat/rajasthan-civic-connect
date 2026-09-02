@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function DashboardPreview({ authenticatedUser, setAuthenticatedUser, setActivePage }) {
+export default function DashboardPreview({ authenticatedUser, setAuthenticatedUser, setActivePage, handleSignOut }) {
   // Mobile responsive sidebar toggle
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -216,10 +216,14 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
 
   // Sign out handler
   const handleSignOutTrigger = () => {
-    if (setAuthenticatedUser) {
-      setAuthenticatedUser(null);
+    if (handleSignOut) {
+      handleSignOut();
+    } else {
+      if (setAuthenticatedUser) setAuthenticatedUser(null);
+      localStorage.removeItem('rajcivic_user');
+      localStorage.removeItem('firebaseIdToken');
+      setActivePage('Home');
     }
-    setActivePage('Home');
   };
 
   // Filtered Complaint Calculations

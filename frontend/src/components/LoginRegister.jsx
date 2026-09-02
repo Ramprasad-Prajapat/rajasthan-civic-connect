@@ -25,9 +25,15 @@ const GoogleSvg = () => (
   </svg>
 );
 
-export default function LoginRegister({ authenticatedUser, setAuthenticatedUser, setActivePage }) {
+export default function LoginRegister({ authenticatedUser, setAuthenticatedUser, setActivePage, authViewMode = 'login', setAuthViewMode, handleSignOut: handleSignOutProp }) {
   const [activePortal, setActivePortal] = useState('citizen');
-  const [authView, setAuthView] = useState('login'); // 'login' | 'register' | 'forgot'
+  const [authView, setAuthView] = useState(authViewMode || 'login'); // 'login' | 'register' | 'forgot'
+
+  React.useEffect(() => {
+    if (authViewMode && (authViewMode === 'login' || authViewMode === 'register')) {
+      setAuthView(authViewMode);
+    }
+  }, [authViewMode]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,7 +95,11 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
   };
 
   const switchView = (view) => {
-    setAuthView(view); setAlertMsg(null);
+    setAuthView(view);
+    if (setAuthViewMode && (view === 'login' || view === 'register')) {
+      setAuthViewMode(view);
+    }
+    setAlertMsg(null);
     setEmail(''); setPassword(''); setName(''); setMobile('');
     setConfirmPassword(''); setOtpSent(false); setOtp('');
     setOtpVerified(false); setTermsAgreed(false);
@@ -351,12 +361,24 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
   };
 
   // Sign out
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    if (handleSignOutProp) {
+      await handleSignOutProp();
+      triggerAlert('success', 'Logged out successfully.');
+      return;
+    }
     localStorage.removeItem('firebaseIdToken');
+    localStorage.removeItem('rajcivic_user');
     if (isFirebaseConfigured && auth) {
-      auth.signOut().catch(() => {});
+      try {
+        const { signOut } = await import('firebase/auth');
+        await signOut(auth);
+      } catch (err) {
+        console.error("Sign out error:", err);
+      }
     }
     if (setAuthenticatedUser) setAuthenticatedUser(null);
+    if (setActivePage) setActivePage('Home');
     triggerAlert('success', 'Logged out successfully.');
   };
 

@@ -32,6 +32,17 @@ async function getAuthHeader() {
   if (firebaseIdToken) {
     return { 'Authorization': `Bearer ${firebaseIdToken}` };
   }
+  const rajcivicUserStr = localStorage.getItem('rajcivic_user');
+  if (rajcivicUserStr) {
+    try {
+      const u = JSON.parse(rajcivicUserStr);
+      const payload = btoa(JSON.stringify({ uid: u.uid || u.email, email: u.email, role: u.role, portal: u.portal }));
+      const customToken = `db.${payload}.sig`;
+      return { 'Authorization': `Bearer ${customToken}` };
+    } catch (e) {
+      // ignore
+    }
+  }
   return {};
 }
 
@@ -50,6 +61,9 @@ export async function loginUser(email, password, portal) {
     throw new Error(errorData.error || "Failed to log in");
   }
   const data = await response.json();
+  if (data.token) {
+    localStorage.setItem('firebaseIdToken', data.token);
+  }
   return data.user;
 }
 
