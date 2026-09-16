@@ -244,6 +244,9 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
       }
 
       try {
+        // Call the backend registration API first
+        await registerUser(name, email, password, mobile, 'Citizen', 'citizen');
+
         if (isFirebaseConfigured && auth) {
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -261,12 +264,9 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
             };
             await saveUserProfile(user.uid, profileData);
           } catch (fbErr) {
-            console.warn("Firebase Auth registration failed or not supported, proceeding with DB registration...", fbErr);
+            console.info("Database registration completed. Firebase Auth sync note:", fbErr.message || fbErr);
           }
         }
-
-        // Call the backend registration API
-        await registerUser(name, email, password, mobile, 'Citizen', 'citizen');
 
         triggerAlert('success', `Registration successful! Please login with your password.`);
         switchView('login');

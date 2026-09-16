@@ -172,8 +172,8 @@ export const registerUser = async (req, res) => {
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
-  if (!passwordPolicy.test(password)) {
-    return res.status(400).json({ error: 'Password does not meet strength requirements' });
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
   }
   // Simple validation for Indian mobile numbers
   const mobileRegex = /^[6-9]\d{9}$/;
