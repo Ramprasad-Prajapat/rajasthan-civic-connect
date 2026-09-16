@@ -31,7 +31,10 @@ const logMode = () => {
 try {
   // Full service‑account credentials present → use Admin SDK
   if (clientEmail && privateKey) {
-    const formattedPrivateKey = privateKey.replace(/\\\\n/g, '\n').replace(/^"|"$/g, '').trim();
+    const formattedPrivateKey = privateKey
+      .replace(/\\n/g, '\n')
+      .replace(/^"|"$/g, '')
+      .trim();
     app = admin.initializeApp({
       credential: admin.credential.cert({ projectId, clientEmail, privateKey: formattedPrivateKey }),
       storageBucket,
