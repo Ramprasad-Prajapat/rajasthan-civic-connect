@@ -71,6 +71,7 @@ public class DataSeeder implements CommandLineRunner {
         User citizen = seedUserIfMissing("citizen@civic.local", "Demo Citizen", "Citizen@123", Constants.ROLE_CITIZEN, "citizen", null);
         seedUserIfMissing("officer@civic.local", "Officer Water", "Officer@123", Constants.ROLE_OFFICER, "department", waterDept.getId());
         seedUserIfMissing("officer2@civic.local", "Officer Sanitation", "Officer@123", Constants.ROLE_OFFICER, "department", sanitationDept.getId());
+        seedUserIfMissing("sanitation.officer@civic.local", "Officer Sanitation", "Officer@123", Constants.ROLE_OFFICER, "department", sanitationDept.getId());
         seedUserIfMissing("admin@civic.local", "System Administrator", "Admin@123", Constants.ROLE_ADMIN, "admin", null);
 
         // 3. Seed sample complaints if table is empty

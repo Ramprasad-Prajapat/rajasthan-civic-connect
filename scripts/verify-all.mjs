@@ -74,18 +74,18 @@ async function stopProcess(child) {
   }
 }
 
-async function pollHealth(url, timeoutMs = 120000) {
+async function pollHealth(url, timeoutMs = 90000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(1000) });
       if (res.ok) {
         return true;
       }
     } catch (e) {
       // not ready yet
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1000));
   }
   return false;
 }
@@ -219,11 +219,11 @@ async function main() {
   );
 
   console.log(`[*] Verification server spawned (PID: ${backendProc.pid}). Polling health endpoint...`);
-  const isHealthy = await pollHealth('http://localhost:18080/api/health', 90000);
+  const isHealthy = await pollHealth('http://127.0.0.1:18080/api/health', 90000);
 
   if (isHealthy) {
     console.log('[+] Verification server is healthy. Executing scripts/smoke-test.mjs...');
-    const smokeRun = spawnSync('node', [path.join(projectRoot, 'scripts', 'smoke-test.mjs'), 'http://localhost:18080/api'], {
+    const smokeRun = spawnSync('node', [path.join(projectRoot, 'scripts', 'smoke-test.mjs'), 'http://127.0.0.1:18080/api'], {
       stdio: 'inherit'
     });
     await stopProcess(backendProc);
@@ -277,11 +277,11 @@ async function main() {
       { cwd: backendDir, stdio: ['ignore', restLogStream, restLogStream] }
     );
 
-    const upA = await pollHealth('http://localhost:18080/api/health', 60000);
+    const upA = await pollHealth('http://127.0.0.1:18080/api/health', 60000);
     if (!upA) throw new Error('Verification backend failed to start before restart test');
 
     // Citizen login
-    const citLoginRes = await fetch('http://localhost:18080/api/auth/login', {
+    const citLoginRes = await fetch('http://127.0.0.1:18080/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'citizen@civic.local', password: 'Citizen@123', portal: 'citizen' })
@@ -289,7 +289,7 @@ async function main() {
     const citToken = (await citLoginRes.json()).token;
 
     // Admin login
-    const admLoginRes = await fetch('http://localhost:18080/api/auth/login', {
+    const admLoginRes = await fetch('http://127.0.0.1:18080/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'admin@civic.local', password: 'Admin@123', portal: 'admin' })
@@ -298,7 +298,7 @@ async function main() {
 
     // A. Create complaint with photo
     const photoData = 'data:image/jpeg;base64,' + Buffer.from('photo-proof-restart-test').toString('base64');
-    const compCreateRes = await fetch('http://localhost:18080/api/complaints', {
+    const compCreateRes = await fetch('http://127.0.0.1:18080/api/complaints', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${citToken}` },
       body: JSON.stringify({
@@ -320,7 +320,7 @@ async function main() {
       description: 'Draft notes testing DB persistence',
       category: 'Sanitation'
     };
-    await fetch('http://localhost:18080/api/complaints/draft', {
+    await fetch('http://127.0.0.1:18080/api/complaints/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${citToken}` },
       body: JSON.stringify(draftPayload)
@@ -328,7 +328,7 @@ async function main() {
 
     // C. Create department
     const deptName = 'Restart Dept ' + Date.now();
-    await fetch('http://localhost:18080/api/departments', {
+    await fetch('http://127.0.0.1:18080/api/departments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${admToken}` },
       body: JSON.stringify({
@@ -359,16 +359,16 @@ async function main() {
       { cwd: backendDir, stdio: ['ignore', restLogStream, restLogStream] }
     );
 
-    const upB = await pollHealth('http://localhost:18080/api/health', 60000);
+    const upB = await pollHealth('http://127.0.0.1:18080/api/health', 60000);
     if (!upB) throw new Error('Verification backend failed to restart');
 
     // Re-login after restart
-    const citReLogin = await (await fetch('http://localhost:18080/api/auth/login', {
+    const citReLogin = await (await fetch('http://127.0.0.1:18080/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'citizen@civic.local', password: 'Citizen@123', portal: 'citizen' })
     })).json();
-    const admReLogin = await (await fetch('http://localhost:18080/api/auth/login', {
+    const admReLogin = await (await fetch('http://127.0.0.1:18080/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'admin@civic.local', password: 'Admin@123', portal: 'admin' })
@@ -376,7 +376,7 @@ async function main() {
 
     // Verify Readback
     // A. Read complaint + photo
-    const compReadRes = await fetch(`http://localhost:18080/api/complaints/${targetCompId}`, {
+    const compReadRes = await fetch(`http://127.0.0.1:18080/api/complaints/${targetCompId}`, {
       headers: { 'Authorization': `Bearer ${citReLogin.token}` }
     });
     const compRead = await compReadRes.json();
@@ -389,7 +389,7 @@ async function main() {
     }
 
     // B. Read draft
-    const draftReadRes = await fetch('http://localhost:18080/api/complaints/draft', {
+    const draftReadRes = await fetch('http://127.0.0.1:18080/api/complaints/draft', {
       headers: { 'Authorization': `Bearer ${citReLogin.token}` }
     });
     const draftRead = await draftReadRes.json();
@@ -398,7 +398,7 @@ async function main() {
     }
 
     // C. Read department
-    const deptReadRes = await fetch('http://localhost:18080/api/departments', {
+    const deptReadRes = await fetch('http://127.0.0.1:18080/api/departments', {
       headers: { 'Authorization': `Bearer ${admReLogin.token}` }
     });
     const deptList = await deptReadRes.json();

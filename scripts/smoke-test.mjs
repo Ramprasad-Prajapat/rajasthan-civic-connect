@@ -438,7 +438,7 @@ async function run() {
     });
     assert(reassignRes.ok, `PUT /complaints/{id}/department returned ${reassignRes.status}`);
     const reassignedComp = await reassignRes.json();
-    assert(reassignedComp.departmentId === createdDeptId, 'Complaint department reassigned');
+    assert(String(reassignedComp.departmentId) === String(createdDeptId), 'Complaint department reassigned');
 
     // Admin updates complaint status
     const adminCompStatus = await fetch(`${baseUrl}/complaints/${createdComplaintDbId}/status`, {

@@ -53,6 +53,16 @@ public class AdminController {
         return ResponseEntity.ok(updated);
     }
 
+    @PutMapping({"/admin/officers/{id}/toggle-active", "/admin/officers/{id}/active"})
+    public ResponseEntity<UserResponse> toggleOfficerActive(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User caller
+    ) {
+        enforceAdmin(caller);
+        UserResponse updated = adminService.toggleOfficerActive(id);
+        return ResponseEntity.ok(updated);
+    }
+
     @GetMapping("/admin/users")
     public ResponseEntity<List<UserResponse>> getAllUsers(@AuthenticationPrincipal User caller) {
         enforceAdmin(caller);
@@ -65,7 +75,7 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAdminStats());
     }
 
-    @GetMapping("/department/stats")
+    @GetMapping({"/department/stats", "/departments/my/stats"})
     public ResponseEntity<DepartmentStatsResponse> getDepartmentStats(@AuthenticationPrincipal User caller) {
         if (caller == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Authentication required");

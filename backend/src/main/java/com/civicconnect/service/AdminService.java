@@ -108,6 +108,18 @@ public class AdminService {
         return UserResponse.fromEntity(saved, deptName);
     }
 
+    @Transactional
+    public UserResponse toggleOfficerActive(Long id) {
+        User officer = userRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Officer not found"));
+        officer.setActive(!officer.isActive());
+        User saved = userRepository.save(officer);
+        String deptName = saved.getDepartmentId() != null
+                ? departmentRepository.findById(saved.getDepartmentId()).map(Department::getName).orElse(null)
+                : null;
+        return UserResponse.fromEntity(saved, deptName);
+    }
+
     @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
         Map<Long, String> deptMap = departmentRepository.findAll().stream()

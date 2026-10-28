@@ -126,6 +126,19 @@ public class DepartmentService {
     }
 
     @Transactional
+    public DepartmentResponse toggleDepartmentActive(Long id) {
+        Department dept = findById(id);
+        dept.setActive(!dept.isActive());
+        dept.setUpdatedAt(Instant.now());
+        Department saved = departmentRepository.save(dept);
+        return DepartmentResponse.fromEntity(
+                saved,
+                userRepository.countByDepartmentId(saved.getId()),
+                complaintRepository.countByDepartmentId(saved.getId())
+        );
+    }
+
+    @Transactional
     public void deleteDepartment(Long id) {
         Department dept = findById(id);
 

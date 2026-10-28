@@ -58,16 +58,18 @@ public class DepartmentController {
         return ResponseEntity.ok(updated);
     }
 
-    @PutMapping("/{id}/active")
+    @PutMapping({"/{id}/active", "/{id}/toggle-active"})
     public ResponseEntity<DepartmentResponse> setDepartmentActive(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> body,
+            @RequestBody(required = false) Map<String, Object> body,
             @AuthenticationPrincipal User caller
     ) {
         enforceAdmin(caller);
-        boolean active = body.get("active") != null ? Boolean.parseBoolean(body.get("active").toString()) : true;
-        DepartmentResponse updated = departmentService.setDepartmentActive(id, active);
-        return ResponseEntity.ok(updated);
+        if (body != null && body.containsKey("active")) {
+            boolean active = Boolean.parseBoolean(body.get("active").toString());
+            return ResponseEntity.ok(departmentService.setDepartmentActive(id, active));
+        }
+        return ResponseEntity.ok(departmentService.toggleDepartmentActive(id));
     }
 
     @DeleteMapping("/{id}")

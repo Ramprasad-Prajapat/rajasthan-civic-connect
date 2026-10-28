@@ -1,5 +1,6 @@
 package com.civicconnect.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,7 @@ public record CreateOfficerRequest(
         String phone,
 
         @NotBlank(message = "Initial password is required")
+        @JsonAlias({"password"})
         String initialPassword,
 
         @NotNull(message = "Department ID is required")

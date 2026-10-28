@@ -56,6 +56,7 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/login"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/departments", "/departments").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
