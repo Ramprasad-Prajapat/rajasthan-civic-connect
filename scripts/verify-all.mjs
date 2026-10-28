@@ -327,18 +327,15 @@ async function main() {
     });
 
     // C. Create department
-    const deptId = 'restart_dept_' + Date.now();
     const deptName = 'Restart Dept ' + Date.now();
     await fetch('http://localhost:18080/api/departments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${admToken}` },
       body: JSON.stringify({
-        id: deptId,
-        deptId: deptId,
         name: deptName,
-        head: 'Head Officer',
-        contact: '0141-999999',
-        status: 'Active'
+        code: 'RST',
+        description: 'Restart test department',
+        contact: '0141-999999'
       })
     });
 
@@ -405,9 +402,9 @@ async function main() {
       headers: { 'Authorization': `Bearer ${admReLogin.token}` }
     });
     const deptList = await deptReadRes.json();
-    const foundDept = Array.isArray(deptList) && deptList.find((d) => d.deptId === deptId || d.name === deptName);
+    const foundDept = Array.isArray(deptList) && deptList.find((d) => d.name === deptName);
     if (!foundDept) {
-      throw new Error(`Department ${deptId} not found after restart`);
+      throw new Error(`Department ${deptName} not found after restart`);
     }
 
     await stopProcess(procB);

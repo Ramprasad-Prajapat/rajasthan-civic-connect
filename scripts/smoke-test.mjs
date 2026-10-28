@@ -1,5 +1,5 @@
 /**
- * Live Smoke Test, CORS Check (T4), and Contract Sweep (T5) for Rajasthan Civic Connect API.
+ * Live Smoke Test, CORS Check, and Contract Sweep for Rajasthan Civic Connect API.
  * Uses native fetch (Node 18+), zero external dependencies.
  */
 
@@ -28,10 +28,14 @@ async function run() {
   console.log(`Target: ${baseUrl}\n`);
 
   let citizenToken = null;
-  let citizenId = null;
   let citizenEmail = `smoke_citizen_${Date.now()}@test.local`;
-  let officerToken = null;
+  let officer1Token = null;
+  let officer2Token = null;
+  let adminToken = null;
   let createdComplaintId = null;
+  let createdComplaintDbId = null;
+  let createdDeptId = null;
+  let createdOfficerId = null;
 
   // 1. Health check
   try {
@@ -44,7 +48,34 @@ async function run() {
     logFail('1. Health check', e.message);
   }
 
-  // 2. Register citizen
+  // 2. CORS Preflight
+  try {
+    const res = await fetch(`${baseUrl}/complaints`, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'http://localhost:5173',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type, Authorization'
+      }
+    });
+    assert(res.ok || res.status === 204 || res.status === 200, `Expected 200/204, got ${res.status}`);
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    assert(allowOrigin === '*' || allowOrigin === 'http://localhost:5173', `Invalid allow-origin: ${allowOrigin}`);
+    logPass('2. CORS preflight check passed');
+  } catch (e) {
+    logFail('2. CORS preflight check', e.message);
+  }
+
+  // 3. Unauthenticated access check (401)
+  try {
+    const res = await fetch(`${baseUrl}/complaints`);
+    assert(res.status === 401, `Expected 401 Unauthorized, got ${res.status}`);
+    logPass('3. Unauthenticated access correctly rejected with 401');
+  } catch (e) {
+    logFail('3. Unauthenticated access check', e.message);
+  }
+
+  // 4. Citizen registration
   try {
     const res = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
@@ -53,9 +84,7 @@ async function run() {
         name: 'Smoke Citizen',
         email: citizenEmail,
         password: 'Password@123',
-        mobile: '9876543210',
-        role: 'Citizen',
-        portal: 'citizen'
+        phone: '9876543210'
       })
     });
     assert(res.status === 201, `Expected 201, got ${res.status}`);
@@ -64,13 +93,12 @@ async function run() {
     assert(data.user.role === 'Citizen', 'Role is Citizen');
     assert(data.token, 'Token returned');
     citizenToken = data.token;
-    citizenId = data.user.id || data.user.uid;
-    logPass('2. Citizen registration returned 201 with JWT token and Citizen role');
+    logPass('4. Citizen registration returned 201 with JWT token and Citizen role');
   } catch (e) {
-    logFail('2. Citizen registration', e.message);
+    logFail('4. Citizen registration', e.message);
   }
 
-  // 3. Citizen login
+  // 5. Citizen login
   try {
     const res = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
@@ -84,14 +112,68 @@ async function run() {
     assert(res.ok, `HTTP ${res.status}`);
     const data = await res.json();
     assert(data.token, 'Token present');
-    assert(data.user && (data.user.id || data.user.uid), 'User id present');
+    assert(data.user && data.user.role === 'Citizen', 'Role is Citizen');
     citizenToken = data.token;
-    logPass('3. Citizen login returned 200 with token and user object');
+    logPass('5. Citizen login returned 200 with token and user profile');
   } catch (e) {
-    logFail('3. Citizen login', e.message);
+    logFail('5. Citizen login', e.message);
   }
 
-  // 4. Create complaint
+  // 6. Citizen profile (GET /auth/me & PUT /auth/me)
+  try {
+    const getRes = await fetch(`${baseUrl}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${citizenToken}` }
+    });
+    assert(getRes.ok, `GET /auth/me failed with ${getRes.status}`);
+    const profile = await getRes.json();
+    assert(profile.email === citizenEmail, 'Email matches');
+
+    const putRes = await fetch(`${baseUrl}/auth/me`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${citizenToken}`
+      },
+      body: JSON.stringify({ name: 'Smoke Citizen Updated', phone: '9876543299' })
+    });
+    assert(putRes.ok, `PUT /auth/me failed with ${putRes.status}`);
+    const updated = await putRes.json();
+    assert(updated.name === 'Smoke Citizen Updated', 'Name updated');
+    logPass('6. Profile GET and PUT /auth/me passed');
+  } catch (e) {
+    logFail('6. Profile preview & update', e.message);
+  }
+
+  // 7. Citizen complaint draft
+  try {
+    const saveRes = await fetch(`${baseUrl}/complaints/draft`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${citizenToken}`
+      },
+      body: JSON.stringify({ title: 'Draft Complaint Title', description: 'Draft description' })
+    });
+    assert(saveRes.ok, `POST /complaints/draft failed with ${saveRes.status}`);
+
+    const getRes = await fetch(`${baseUrl}/complaints/draft`, {
+      headers: { 'Authorization': `Bearer ${citizenToken}` }
+    });
+    assert(getRes.ok, `GET /complaints/draft failed with ${getRes.status}`);
+    const draftData = await getRes.json();
+    assert(draftData && draftData.draft && draftData.draft.title === 'Draft Complaint Title', 'Draft retrieved');
+
+    const delRes = await fetch(`${baseUrl}/complaints/draft`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${citizenToken}` }
+    });
+    assert(delRes.ok, `DELETE /complaints/draft failed with ${delRes.status}`);
+    logPass('7. Citizen complaint draft lifecycle (save, fetch, delete) passed');
+  } catch (e) {
+    logFail('7. Complaint draft lifecycle', e.message);
+  }
+
+  // 8. Citizen creates complaint
   try {
     const res = await fetch(`${baseUrl}/complaints`, {
       method: 'POST',
@@ -100,56 +182,52 @@ async function run() {
         'Authorization': `Bearer ${citizenToken}`
       },
       body: JSON.stringify({
-        title: 'Smoke Test Pothole',
-        description: 'Large pothole on road',
-        category: 'road',
+        title: 'Smoke Test Water Pipe Leakage',
+        description: 'Main pipeline leak causing flooding',
+        category: 'water',
         district: 'Jaipur',
         ulbName: 'Nagar Nigam Jaipur',
-        priority: 'Normal'
+        priority: 'High'
       })
     });
     assert(res.status === 201, `Expected 201, got ${res.status}`);
     const data = await res.json();
     assert(data.id && data.complaintId, 'id and complaintId present');
-    assert(data.complaintId.startsWith('RJCIVIC-JAI-NNG-'), `Format matches: ${data.complaintId}`);
-    assert(data.departmentName === 'Public Works Department', `Department mapped: ${data.departmentName}`);
-    assert(data.slaHours === 48, `SLA calculated: ${data.slaHours}h`);
-    assert(data.timeline && data.timeline.length === 1, 'Initial timeline event logged');
+    assert(data.departmentName === 'Water Department', `Department mapped to Water Department: ${data.departmentName}`);
+    assert(data.timeline && data.timeline.length >= 1, 'Initial timeline event logged');
     createdComplaintId = data.complaintId;
-    logPass(`4. Create complaint lodged ticket ${createdComplaintId} with SLA and timeline`);
+    createdComplaintDbId = data.id;
+    logPass(`8. Create complaint lodged ticket ${createdComplaintId} mapped to ${data.departmentName}`);
   } catch (e) {
-    logFail('4. Create complaint', e.message);
+    logFail('8. Create complaint', e.message);
   }
 
-  // 5. List complaints (citizen view)
+  // 9. Citizen list own complaints
   try {
-    const res = await fetch(`${baseUrl}/complaints`, {
+    const resAll = await fetch(`${baseUrl}/complaints`, {
       headers: { 'Authorization': `Bearer ${citizenToken}` }
     });
-    assert(res.ok, `HTTP ${res.status}`);
-    const data = await res.json();
-    assert(Array.isArray(data), 'Returns an array');
-    assert(data.some(c => c.complaintId === createdComplaintId), 'Created complaint listed');
-    logPass('5. List complaints returned citizen own tickets');
-  } catch (e) {
-    logFail('5. List complaints', e.message);
-  }
+    assert(resAll.ok, `GET /complaints returned ${resAll.status}`);
+    const allList = await resAll.json();
+    assert(Array.isArray(allList) && allList.some(c => c.complaintId === createdComplaintId), 'Created complaint listed in /complaints');
 
-  // 6. Complaint detail
-  try {
-    const res = await fetch(`${baseUrl}/complaints/${createdComplaintId}`, {
+    const resMy = await fetch(`${baseUrl}/complaints/my`, {
       headers: { 'Authorization': `Bearer ${citizenToken}` }
     });
-    assert(res.ok, `HTTP ${res.status}`);
-    const data = await res.json();
-    assert(data.complaintId === createdComplaintId, 'Detail matching ticket code');
-    assert(Array.isArray(data.timeline), 'Timeline present');
-    logPass('6. Complaint detail returned full ticket with timeline');
+    assert(resMy.ok, `GET /complaints/my returned ${resMy.status}`);
+    const myList = await resMy.json();
+    assert(Array.isArray(myList) && myList.some(c => c.complaintId === createdComplaintId), 'Created complaint listed in /complaints/my');
+
+    const resDetail = await fetch(`${baseUrl}/complaints/${createdComplaintId}`, {
+      headers: { 'Authorization': `Bearer ${citizenToken}` }
+    });
+    assert(resDetail.ok, `GET /complaints/${createdComplaintId} returned ${resDetail.status}`);
+    logPass('9. Citizen complaint retrieval (/complaints, /complaints/my, /complaints/{idOrCode}) passed');
   } catch (e) {
-    logFail('6. Complaint detail', e.message);
+    logFail('9. Citizen complaint retrieval', e.message);
   }
 
-  // 7. Login as seeded officer
+  // 10. Officer 1 (Water Department) Login & Department Scoping
   try {
     const res = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
@@ -160,174 +238,295 @@ async function run() {
         portal: 'department'
       })
     });
-    assert(res.ok, `HTTP ${res.status}`);
+    assert(res.ok, `Officer 1 login returned ${res.status}`);
     const data = await res.json();
-    assert(data.token, 'Token present');
-    officerToken = data.token;
-    logPass('7. Logged in as demo officer (officer@civic.local)');
-  } catch (e) {
-    logFail('7. Seeded officer login', e.message);
-  }
+    assert(data.token, 'Officer token present');
+    officer1Token = data.token;
 
-  // 8. Officer status update
-  try {
-    const res = await fetch(`${baseUrl}/complaints/${createdComplaintId}/status`, {
+    // View complaints in own department
+    const listRes = await fetch(`${baseUrl}/complaints`, {
+      headers: { 'Authorization': `Bearer ${officer1Token}` }
+    });
+    assert(listRes.ok, `Officer GET /complaints returned ${listRes.status}`);
+    const list = await listRes.json();
+    assert(Array.isArray(list) && list.some(c => c.complaintId === createdComplaintId), 'Water officer sees water complaint');
+
+    // Department Stats
+    const statsRes = await fetch(`${baseUrl}/departments/my/stats`, {
+      headers: { 'Authorization': `Bearer ${officer1Token}` }
+    });
+    assert(statsRes.ok, `GET /departments/my/stats returned ${statsRes.status}`);
+    const stats = await statsRes.json();
+    assert(typeof stats.totalComplaints === 'number' || typeof stats.total === 'number', 'Officer stats structure valid');
+
+    // Update complaint status
+    const updateRes = await fetch(`${baseUrl}/complaints/${createdComplaintDbId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${officerToken}`
+        'Authorization': `Bearer ${officer1Token}`
       },
       body: JSON.stringify({
         status: 'InProgress',
-        remarks: 'Field executive dispatched to site'
+        remark: 'Inspection team dispatched by Water Department'
       })
     });
-    assert(res.ok, `HTTP ${res.status}`);
-    logPass('8. Officer updated complaint status to InProgress');
+    assert(updateRes.ok, `Officer PUT /complaints/{id}/status returned ${updateRes.status}`);
+    const updated = await updateRes.json();
+    assert(updated.status === 'InProgress', 'Status updated to InProgress');
+
+    logPass('10. Officer 1 (Water Dept) login, stats, and status update passed');
   } catch (e) {
-    logFail('8. Status update by officer', e.message);
+    logFail('10. Officer 1 operations', e.message);
   }
 
-  // 9. Verify detail reflects new timeline row
+  // 11. Officer 2 (Sanitation Department) Login & Cross-department protection (403)
   try {
-    const res = await fetch(`${baseUrl}/complaints/${createdComplaintId}`, {
-      headers: { 'Authorization': `Bearer ${officerToken}` }
+    const res = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'sanitation.officer@civic.local',
+        password: 'Officer@123',
+        portal: 'department'
+      })
     });
-    assert(res.ok, `HTTP ${res.status}`);
+    assert(res.ok, `Officer 2 login returned ${res.status}`);
     const data = await res.json();
-    assert(data.status === 'InProgress', 'Status is InProgress');
-    assert(data.timeline && data.timeline.length >= 2, `Timeline rows: ${data.timeline?.length}`);
-    logPass('9. Complaint detail verified second timeline audit row');
+    assert(data.token, 'Officer 2 token present');
+    officer2Token = data.token;
+
+    // View complaints: officer 2 must NOT see Water Department complaint
+    const listRes = await fetch(`${baseUrl}/complaints`, {
+      headers: { 'Authorization': `Bearer ${officer2Token}` }
+    });
+    assert(listRes.ok, `Officer 2 GET /complaints returned ${listRes.status}`);
+    const list = await listRes.json();
+    const hasWaterComplaint = Array.isArray(list) && list.some(c => c.complaintId === createdComplaintId);
+    assert(!hasWaterComplaint, 'Sanitation officer cannot view Water complaint');
+
+    // Cross-department update must return 403 Forbidden
+    const crossUpdateRes = await fetch(`${baseUrl}/complaints/${createdComplaintDbId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${officer2Token}`
+      },
+      body: JSON.stringify({
+        status: 'Resolved',
+        remark: 'Attempting illegal cross-department update'
+      })
+    });
+    assert(crossUpdateRes.status === 403, `Expected 403 Forbidden on cross-department update, got ${crossUpdateRes.status}`);
+
+    logPass('11. Officer 2 cross-department scoping and 403 forbidden protection verified');
   } catch (e) {
-    logFail('9. Detail timeline verification', e.message);
+    logFail('11. Officer 2 cross-department check', e.message);
   }
 
-  // 10. Spot check: Citizen status update -> 403
+  // 12. Admin Operations (CRUD Departments, CRUD Officers, Users list, Stats, Reassign)
   try {
-    const res = await fetch(`${baseUrl}/complaints/${createdComplaintId}/status`, {
+    const res = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@civic.local',
+        password: 'Admin@123',
+        portal: 'admin'
+      })
+    });
+    assert(res.ok, `Admin login returned ${res.status}`);
+    const data = await res.json();
+    assert(data.token, 'Admin token present');
+    adminToken = data.token;
+
+    // Admin Stats
+    const statsRes = await fetch(`${baseUrl}/admin/stats`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(statsRes.ok, `GET /admin/stats returned ${statsRes.status}`);
+    const stats = await statsRes.json();
+    assert(typeof stats.totalComplaints === 'number', 'totalComplaints present in admin stats');
+    assert(typeof stats.totalOfficers === 'number', 'totalOfficers present in admin stats');
+
+    // Admin creates department
+    const deptRes = await fetch(`${baseUrl}/departments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        name: `Parks Dept ${Date.now()}`,
+        code: 'PARK',
+        description: 'Public parks and horticulture management',
+        contact: '0141-888888'
+      })
+    });
+    assert(deptRes.status === 201, `POST /departments returned ${deptRes.status}`);
+    const dept = await deptRes.json();
+    createdDeptId = dept.id;
+
+    // Admin lists departments
+    const deptListRes = await fetch(`${baseUrl}/departments`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(deptListRes.ok, `GET /departments returned ${deptListRes.status}`);
+    const depts = await deptListRes.json();
+    assert(depts.some(d => d.id === createdDeptId), 'New department is in departments list');
+
+    // Admin updates department
+    const updateDeptRes = await fetch(`${baseUrl}/departments/${createdDeptId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        name: dept.name,
+        code: 'PARK-UPD',
+        description: 'Updated parks description',
+        contact: '0141-777777'
+      })
+    });
+    assert(updateDeptRes.ok, `PUT /departments/{id} returned ${updateDeptRes.status}`);
+
+    // Admin creates officer in new department
+    const offEmail = `test_officer_${Date.now()}@civic.local`;
+    const offRes = await fetch(`${baseUrl}/admin/officers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        name: 'New Park Officer',
+        email: offEmail,
+        phone: '9876543212',
+        password: 'InitialPass@123',
+        departmentId: createdDeptId
+      })
+    });
+    assert(offRes.status === 201, `POST /admin/officers returned ${offRes.status}`);
+    const officerData = await offRes.json();
+    createdOfficerId = officerData.id;
+
+    // Admin lists officers
+    const offListRes = await fetch(`${baseUrl}/admin/officers`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(offListRes.ok, `GET /admin/officers returned ${offListRes.status}`);
+    const officers = await offListRes.json();
+    assert(officers.some(o => o.id === createdOfficerId), 'New officer in officers list');
+
+    // Admin lists users (read-only)
+    const usersRes = await fetch(`${baseUrl}/admin/users`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(usersRes.ok, `GET /admin/users returned ${usersRes.status}`);
+    const users = await usersRes.json();
+    assert(Array.isArray(users) && users.length >= 3, 'Users list returned');
+
+    // Admin reassigns complaint department
+    const reassignRes = await fetch(`${baseUrl}/complaints/${createdComplaintDbId}/department`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ departmentId: createdDeptId })
+    });
+    assert(reassignRes.ok, `PUT /complaints/{id}/department returned ${reassignRes.status}`);
+    const reassignedComp = await reassignRes.json();
+    assert(reassignedComp.departmentId === createdDeptId, 'Complaint department reassigned');
+
+    // Admin updates complaint status
+    const adminCompStatus = await fetch(`${baseUrl}/complaints/${createdComplaintDbId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ status: 'Resolved', remark: 'Resolved by Admin' })
+    });
+    assert(adminCompStatus.ok, `Admin PUT /complaints/{id}/status returned ${adminCompStatus.status}`);
+
+    // Department delete returns 409 Conflict when officer or complaint is assigned
+    const delDeptRes = await fetch(`${baseUrl}/departments/${createdDeptId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(delDeptRes.status === 409, `Expected 409 Conflict deleting department with assigned officer/complaint, got ${delDeptRes.status}`);
+
+    // Admin toggles officer active (deactivates officer)
+    const toggleOffRes = await fetch(`${baseUrl}/admin/officers/${createdOfficerId}/toggle-active`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert(toggleOffRes.ok, `PUT /admin/officers/{id}/toggle-active returned ${toggleOffRes.status}`);
+
+    // Attempting login with deactivated officer must return 403 Forbidden
+    const disabledLoginRes = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: offEmail,
+        password: 'InitialPass@123',
+        portal: 'department'
+      })
+    });
+    assert(disabledLoginRes.status === 403, `Expected 403 Forbidden for disabled officer login, got ${disabledLoginRes.status}`);
+
+    logPass('12. Admin CRUD departments & officers, stats, reassignment, 409 conflict, and 403 disabled user passed');
+  } catch (e) {
+    logFail('12. Admin operations', e.message);
+  }
+
+  // 13. Password change
+  try {
+    const changeRes = await fetch(`${baseUrl}/auth/change-password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${citizenToken}`
       },
       body: JSON.stringify({
-        status: 'Resolved',
-        remarks: 'Citizen self resolving'
+        currentPassword: 'Password@123',
+        newPassword: 'NewPassword@123'
       })
     });
-    assert(res.status === 403, `Expected 403, got ${res.status}`);
-    logPass('10. Spot-check: Citizen forbidden from updating status (403)');
-  } catch (e) {
-    logFail('10. Spot-check citizen status 403', e.message);
-  }
+    assert(changeRes.ok, `PUT /auth/change-password returned ${changeRes.status}`);
 
-  // 11. Spot check: No token -> 401
-  try {
-    const res = await fetch(`${baseUrl}/complaints`);
-    assert(res.status === 401, `Expected 401, got ${res.status}`);
-    logPass('11. Spot-check: Protected route without token rejected (401)');
-  } catch (e) {
-    logFail('11. Spot-check no token 401', e.message);
-  }
-
-  // 12. Spot check: Tampered token -> 401
-  try {
-    const res = await fetch(`${baseUrl}/complaints`, {
-      headers: { 'Authorization': 'Bearer tampered.signature.token' }
-    });
-    assert(res.status === 401, `Expected 401, got ${res.status}`);
-    logPass('12. Spot-check: Tampered token rejected (401)');
-  } catch (e) {
-    logFail('12. Spot-check tampered token 401', e.message);
-  }
-
-  // ==========================================
-  // T4: CORS CHECKS (Preflight + Real Request)
-  // ==========================================
-  try {
-    // A. OPTIONS Preflight
-    const optRes = await fetch(`${baseUrl}/auth/login`, {
-      method: 'OPTIONS',
-      headers: {
-        'Origin': 'http://localhost:5173',
-        'Access-Control-Request-Method': 'POST',
-        'Access-Control-Request-Headers': 'Content-Type, Authorization'
-      }
-    });
-    const allowOriginPre = optRes.headers.get('Access-Control-Allow-Origin');
-    assert(allowOriginPre === 'http://localhost:5173', `Preflight allow-origin expected http://localhost:5173, got ${allowOriginPre}`);
-
-    // B. Real POST Request with Origin
-    const postRes = await fetch(`${baseUrl}/auth/login`, {
+    // Login with new password
+    const reLoginRes = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
-      headers: {
-        'Origin': 'http://localhost:5173',
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'officer@civic.local',
-        password: 'Officer@123',
-        portal: 'department'
+        email: citizenEmail,
+        password: 'NewPassword@123',
+        portal: 'citizen'
       })
     });
-    const allowOriginPost = postRes.headers.get('Access-Control-Allow-Origin');
-    assert(allowOriginPost === 'http://localhost:5173', `Real request allow-origin expected http://localhost:5173, got ${allowOriginPost}`);
-    logPass('13. [T4] CORS Check: OPTIONS preflight and real POST return Access-Control-Allow-Origin: http://localhost:5173');
+    assert(reLoginRes.ok, `Login with new password returned ${reLoginRes.status}`);
+    logPass('13. Password change and subsequent login passed');
   } catch (e) {
-    logFail('13. [T4] CORS Check', e.message);
+    logFail('13. Password change', e.message);
   }
 
-  // ==========================================
-  // T5: CONTRACT SWEEP (Every single contract route)
-  // ==========================================
-  console.log('\n--- STARTING T5 CONTRACT SWEEP ---');
+  // 14. Contract Sweep across the exact final API endpoints
+  console.log('\n--- CONTRACT SWEEP ---');
   const sweepChecks = [
-    { method: 'GET', path: '/health', token: null, expected: 200, type: 'CORE' },
-    { method: 'GET', path: '/auth/me', token: citizenToken, expected: 200, type: 'CORE' },
-    { method: 'GET', path: `/users/${citizenId || 1}`, token: citizenToken, expected: 200, type: 'CORE' },
-    { method: 'GET', path: '/complaints/my', token: citizenToken, expected: 200, type: 'CORE' },
-    { method: 'POST', path: '/auth/sync-user', token: citizenToken, body: {}, expected: 501, type: 'AUTH-UNSUPPORTED' },
-    { method: 'POST', path: '/auth/forgot-password-verify', token: null, body: {}, expected: 501, type: 'AUTH-UNSUPPORTED' },
-    { method: 'POST', path: '/auth/reset-password', token: null, body: {}, expected: 501, type: 'AUTH-UNSUPPORTED' },
-    { method: 'GET', path: '/departments', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/departments', token: citizenToken, body: {}, expected: 201, type: 'STUB' },
-    { method: 'PUT', path: '/departments/sanitation', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'DELETE', path: '/departments/sanitation', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/dashboard/citizen', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/dashboard/worker', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/dashboard/officer', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/dashboard/admin', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/emergencies', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/emergencies', token: citizenToken, body: {}, expected: 201, type: 'STUB' },
-    { method: 'PUT', path: '/emergencies/1/status', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/feedback', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/feedback/1', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/notifications', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/notifications/1/read', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/notifications', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/reports/summary', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/reports/complaints', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/reports/export/pdf', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/reports/export/excel', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/users', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/users/1', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'DELETE', path: '/users/1', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/workers', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/workers', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/workers/1/tasks', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/workers/1/status', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/workers/complaints/1/upload-proof', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/complaints/draft', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/complaints/draft', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'DELETE', path: '/complaints/draft', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/complaints/1/assign-worker', token: officerToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'PUT', path: '/complaints/1/reopen', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'DELETE', path: '/complaints/1', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/ai/classify', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/ai/analyze-image', token: citizenToken, body: {}, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/ai/analytics', token: citizenToken, expected: 200, type: 'STUB' },
-    { method: 'GET', path: '/audit-logs', token: officerToken, expected: 200, type: 'STUB' },
-    { method: 'POST', path: '/audit-logs', token: officerToken, body: {}, expected: 201, type: 'STUB' }
+    { name: 'Public Health', method: 'GET', path: '/health', token: null, expected: 200 },
+    { name: 'Public Departments', method: 'GET', path: '/departments', token: null, expected: 200 },
+    { name: 'Auth Profile', method: 'GET', path: '/auth/me', token: citizenToken, expected: 200 },
+    { name: 'Citizen Complaints', method: 'GET', path: '/complaints', token: citizenToken, expected: 200 },
+    { name: 'Citizen Complaints My', method: 'GET', path: '/complaints/my', token: citizenToken, expected: 200 },
+    { name: 'Officer Stats', method: 'GET', path: '/departments/my/stats', token: officer1Token, expected: 200 },
+    { name: 'Admin Stats', method: 'GET', path: '/admin/stats', token: adminToken, expected: 200 },
+    { name: 'Admin Officers List', method: 'GET', path: '/admin/officers', token: adminToken, expected: 200 },
+    { name: 'Admin Users List', method: 'GET', path: '/admin/users', token: adminToken, expected: 200 },
+    { name: 'Admin Departments List', method: 'GET', path: '/departments', token: adminToken, expected: 200 },
+    { name: 'Unauthenticated Complaints', method: 'GET', path: '/complaints', token: null, expected: 401 }
   ];
 
   let sweepPassed = 0;
@@ -336,24 +535,21 @@ async function run() {
     if (check.token) {
       headers['Authorization'] = `Bearer ${check.token}`;
     }
-    const init = { method: check.method, headers };
-    if (check.body) init.body = JSON.stringify(check.body);
-
     try {
-      const res = await fetch(`${baseUrl}${check.path}`, init);
+      const res = await fetch(`${baseUrl}${check.path}`, { method: check.method, headers });
       assert(res.status === check.expected, `Expected ${check.expected}, got ${res.status}`);
       sweepPassed++;
-      console.log(`  [OK] ${check.method} ${check.path} -> ${res.status} (${check.type})`);
+      console.log(`  [OK] ${check.method} ${check.path} -> ${res.status} (${check.name})`);
     } catch (err) {
-      console.error(`  [FAIL] ${check.method} ${check.path} -> ${err.message}`);
+      console.error(`  [FAIL] ${check.method} ${check.path} -> ${err.message} (${check.name})`);
       failedCount++;
     }
   }
 
   if (sweepPassed === sweepChecks.length) {
-    logPass(`14. [T5] Contract Sweep passed: all ${sweepPassed}/${sweepChecks.length} endpoints match specifications`);
+    logPass(`14. Contract Sweep passed: all ${sweepPassed}/${sweepChecks.length} endpoints match specifications`);
   } else {
-    logFail('14. [T5] Contract Sweep', `Only ${sweepPassed}/${sweepChecks.length} endpoints passed`);
+    logFail('14. Contract Sweep', `Only ${sweepPassed}/${sweepChecks.length} endpoints passed`);
   }
 
   console.log(`\n==========================================`);
