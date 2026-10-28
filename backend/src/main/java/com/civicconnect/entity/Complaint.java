@@ -63,7 +63,11 @@ public class Complaint {
     @Column(name = "department_id")
     private Long departmentId;
 
-    @Column(name = "department_name")
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "department_id", insertable = false, updatable = false)
+    private Department department;
+
+    @Transient
     private String departmentName;
 
     @Column(name = "sla_hours")
@@ -174,7 +178,20 @@ public class Complaint {
     public Long getDepartmentId() { return departmentId; }
     public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
 
-    public String getDepartmentName() { return departmentName; }
+    public Department getDepartment() { return department; }
+    public void setDepartment(Department department) {
+        this.department = department;
+        if (department != null) {
+            this.departmentId = department.getId();
+        }
+    }
+
+    public String getDepartmentName() {
+        if (departmentName != null) {
+            return departmentName;
+        }
+        return department != null ? department.getName() : null;
+    }
     public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
 
     public Integer getSlaHours() { return slaHours; }

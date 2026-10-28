@@ -90,6 +90,7 @@ public class ComplaintService {
             complaint.setAccuracy(request.accuracy());
             complaint.setLocationSource(request.locationSource() != null ? request.locationSource() : "CURRENT_LOCATION");
 
+            complaint.setDepartment(department);
             complaint.setDepartmentId(department.getId());
             complaint.setDepartmentName(department.getName());
 
@@ -315,6 +316,7 @@ public class ComplaintService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Target department not found"));
 
         String oldDeptName = complaint.getDepartmentName() != null ? complaint.getDepartmentName() : "Previous Department";
+        complaint.setDepartment(targetDept);
         complaint.setDepartmentId(targetDept.getId());
         complaint.setDepartmentName(targetDept.getName());
 
