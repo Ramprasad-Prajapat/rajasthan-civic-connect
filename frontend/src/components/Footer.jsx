@@ -29,7 +29,9 @@ export default function Footer({ setActivePage }) {
 
   const goToPage = (e, page) => {
     e.preventDefault();
-    setActivePage(page);
+    if (setActivePage) {
+      setActivePage(page);
+    }
   };
 
   return (
@@ -49,9 +51,8 @@ export default function Footer({ setActivePage }) {
             </a>
 
             <p className="rc-footer-desc">
-              RajCivic Connect is a Rajasthan-level civic complaint management platform
-              designed for Nagar Nigam, Nagar Parishad, Nagar Palika, officers,
-              workers and citizens.
+              RajCivic Connect is a Rajasthan-level civic grievance management platform
+              designed for Nagar Nigam, Nagar Parishad, Nagar Palika, officers and citizens.
             </p>
 
             <div className="rc-footer-social">
@@ -70,7 +71,6 @@ export default function Footer({ setActivePage }) {
               <li><a href="#home" onClick={(e) => goToPage(e, 'Home')}>Home</a></li>
               <li><a href="#complaint" onClick={(e) => goToPage(e, 'Complaint')}>Complaint</a></li>
               <li><a href="#track" onClick={(e) => goToPage(e, 'Track Complaint')}>Track Complaint</a></li>
-              <li><a href="#helpdesk" onClick={(e) => goToPage(e, 'Helpdesk')}>Helpdesk</a></li>
               <li><a href="#login" onClick={(e) => goToPage(e, 'Login/Register')}>Login/Register</a></li>
             </ul>
           </div>
@@ -100,7 +100,7 @@ export default function Footer({ setActivePage }) {
               <div className="rc-support-item">
                 <i className="bi bi-telephone-fill"></i>
                 <div>
-                  <h5>Helpdesk Contact</h5>
+                  <h5>Citizen Helpline</h5>
                   <p>1800-180-6127 (Toll-Free)</p>
                 </div>
               </div>
@@ -141,11 +141,11 @@ export default function Footer({ setActivePage }) {
           </div>
 
           <div className="rc-footer-legal">
-            <a href="#helpdesk" onClick={(e) => goToPage(e, 'Helpdesk')}>Contact</a>
+            <a href="#home" onClick={(e) => goToPage(e, 'Home')}>Contact</a>
             <span>•</span>
-            <a href="#helpdesk" onClick={(e) => goToPage(e, 'Helpdesk')}>Privacy Policy</a>
+            <a href="#home" onClick={(e) => goToPage(e, 'Home')}>Privacy Policy</a>
             <span>•</span>
-            <a href="#helpdesk" onClick={(e) => goToPage(e, 'Helpdesk')}>Terms and Conditions</a>
+            <a href="#home" onClick={(e) => goToPage(e, 'Home')}>Terms and Conditions</a>
           </div>
         </div>
 

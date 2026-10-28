@@ -4,12 +4,12 @@ export default function CivicProblems() {
   const problems = [
     { title: 'Complaint tracking missing', desc: 'No unique IDs assigned; citizens never know where their file is stuck.', icon: 'bi-eye-slash-fill' },
     { title: 'Manual complaint delay', desc: 'Snail-paced manual paperwork routes between offices with zero accountability.', icon: 'bi-clock-fill' },
-    { title: 'No worker proof verification', desc: 'Issues are closed on paper without physical site resolution confirmation.', icon: 'bi-image-alt' },
+    { title: 'Missing proof verification', desc: 'Issues are closed on paper without physical site resolution confirmation.', icon: 'bi-image-alt' },
     { title: 'Ward-wise data not available', desc: 'No spatial data exists to trace which ward or local body underperforms.', icon: 'bi-globe-central-south-asia' },
     { title: 'Citizen feedback missing', desc: 'Municipalities resolve complaints unilaterally without citizen satisfaction checks.', icon: 'bi-chat-left-heart' },
     { title: 'Duplicate complaints', desc: 'Hundreds of identical complaints for a single pothole congest active work logs.', icon: 'bi-files' },
     { title: 'SLA delay issue', desc: 'No deadlines exist, leading to complaints remaining unattended for months.', icon: 'bi-hourglass-bottom' },
-    { title: 'Poor transparency', desc: 'No open public analytics or audits exist to track civic resolution rate.', icon: 'bi-shield-slash' }
+    { title: 'Poor transparency', desc: 'No open tracking exists to verify civic resolution progress.', icon: 'bi-shield-slash' }
   ];
 
   return (
@@ -20,7 +20,7 @@ export default function CivicProblems() {
           <span className="badge bg-danger-soft text-danger rc-badge mb-2">Municipal Bottlenecks</span>
           <h2 className="display-6 fw-bold mb-3 text-gradient-primary">Civic Problems We Solve</h2>
           <p className="text-muted mx-auto fs-6" style={{ maxWidth: '750px', lineHeight: '1.7' }}>
-            Many civic complaints are delayed or not tracked properly because of manual systems, unclear responsibility, missing proof and lack of real-time monitoring. RajCivic Connect solves this through digital complaint registration, automatic routing, worker assignment, proof verification and escalation.
+            Many civic complaints are delayed or not tracked properly because of manual systems, unclear responsibility, missing proof and lack of real-time monitoring. RajCivic Connect solves this through digital complaint registration, automatic department routing, and timely resolution.
           </p>
         </div>
 

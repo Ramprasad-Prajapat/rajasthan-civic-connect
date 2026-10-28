@@ -121,7 +121,7 @@ export default function Categories({ setActivePage }) {
           <span className="badge bg-secondary-soft text-primary rc-badge mb-2">Service Catalog</span>
           <h2 className="display-6 fw-bold mb-3 text-gradient-primary">Popular Complaint Categories</h2>
           <p className="text-muted mx-auto" style={{ maxWidth: '600px' }}>
-            Niche options ke zariye specific departments aur expert workers ko request send karein.
+            Niche options ke zariye specific municipal departments ko grievance send karein.
           </p>
         </div>
 

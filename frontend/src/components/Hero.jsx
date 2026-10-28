@@ -73,7 +73,7 @@ export default function Hero({ setActivePage }) {
 
               {/* Subheading */}
               <p className="lead text-muted mb-4 fs-5" style={{ maxWidth: '640px', lineHeight: '1.7' }}>
-                RajCivic Connect is a digital civic service platform for Nagar Nigam, Nagar Parishad, Nagar Palika, wards, departments, officers, workers and citizens to report, track, assign, verify and resolve public complaints.
+                RajCivic Connect is a digital civic service platform for Nagar Nigam, Nagar Parishad, Nagar Palika, wards, departments, officers and citizens to report, track, verify and resolve public complaints.
               </p>
 
               {/* Highlights Badge list */}

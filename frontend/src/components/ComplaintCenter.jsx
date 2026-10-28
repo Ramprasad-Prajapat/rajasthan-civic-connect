@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createComplaint, getComplaint, submitFeedback, reopenComplaint, saveComplaintDraft, getComplaintDraft, deleteComplaintDraft } from '../apiService';
 import MapPicker from './MapPicker';
 export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, authenticatedUser = null }) {
-  // Page sections: 'submit' (form), 'track' (tracking), 'reopen' (reopen form), 'emergency' (alert)
+  // Page sections: 'submit' (form), 'track' (tracking), 'reopen' (reopen form)
   const [activeSection, setActiveSection] = useState(showOnlyTrack ? 'track' : 'submit');
 
   useEffect(() => {
@@ -36,9 +36,6 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Voice Note Recorder Simulator State
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordSeconds, setRecordSeconds] = useState(0);
 
   // Ticking SLA countdown for track details
   const [countdownSeconds, setCountdownSeconds] = useState(21594); // ~6 hours in seconds
@@ -273,33 +270,6 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
     return () => clearInterval(timer);
   }, []);
 
-  // Voice note timer simulation
-  useEffect(() => {
-    let interval;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordSeconds((prev) => {
-          if (prev >= 4) {
-            setIsRecording(false);
-            setFormData((prevForm) => ({
-              ...prevForm,
-              title: 'Widespread Sewerage Spill',
-              description: 'Emergency voice note: Widespread sewer overflow noticed near Gandhi Park, Shastri Nagar. Foul smell spreading across the street and blocking walking corridors.'
-            }));
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isRecording]);
-
-  const triggerVoiceRecord = (e) => {
-    e.preventDefault();
-    setIsRecording(true);
-    setRecordSeconds(0);
-  };
 
   const formatCountdown = (totalSeconds) => {
     const hrs = Math.floor(totalSeconds / 3600);
@@ -462,13 +432,13 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
 
   const stages = [
     { title: 'Submitted', desc: 'Complaint registered' },
-    { title: 'Under Review', desc: 'Photos & tags audited' },
+    { title: 'Under Review', desc: 'Photos & tags verified' },
     { title: 'Approved', desc: 'ULB validation success' },
-    { title: 'Assigned', desc: 'Crew leader allocated' },
-    { title: 'Worker On Way', desc: 'GPS route initialized' },
+    { title: 'Assigned', desc: 'Department routed' },
+    { title: 'In Progress', desc: 'Team in progress' },
     { title: 'Work Started', desc: 'Physical repair in progress' },
     { title: 'Proof Uploaded', desc: 'Completion photo log received' },
-    { title: 'Officer Verification', desc: 'Nodal physical audit' },
+    { title: 'Officer Verification', desc: 'Nodal physical review' },
     { title: 'Resolved', desc: 'Case marked resolved' },
     { title: 'Citizen Feedback', desc: 'Rating feedback locked' },
     { title: 'Closed', desc: 'Locked from reopening' }
@@ -715,8 +685,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
           ward: result.ward,
           dept: result.department,
           officer: result.officer || 'Shri Amit Sharma (Nodal Engineer)',
-          worker: result.assignedWorker ? `${result.assignedWorker.name} (Phone: ${result.assignedWorker.phone})` : 'Assigned Worker Pending',
-          workerStatus: result.status === 'Resolved' || result.status === 'Closed' ? 'Work completed. Proof submitted.' : 'Work in progress.',
+          slaActive: true,
           slaTotal: result.slaDays ? `${result.slaDays * 24} Hours` : '24 Hours',
           slaRemaining: result.status === 'Resolved' || result.status === 'Closed' ? 'Completed within SLA' : 'SLA Active',
           beforeProof: result.beforeProof || result.photo,
@@ -788,9 +757,9 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   };
 
   const faqData = [
-    { q: 'Will my personal identity be revealed to the field worker?', a: 'No, citizen mobile numbers and names are completely masked at the ground worker level to protect privacy. Only the Ward Nodal Officer has decryption rights.' },
+    { q: 'Is citizen personal identity protected?', a: 'Yes, citizen contact details are protected and only accessible to authorized municipal officials.' },
     { q: 'What happens if my category selection is wrong?', a: 'The system has an intelligent routing override. The receiving Ward Officer can re-route the case to the correct department with a single click, which instantly resets the SLA clock.' },
-    { q: 'How does the automatic escalation system work?', a: 'If a high-priority complaint is not resolved within the SLA timer (e.g. 6 hours for sewer overflow), the case automatically escalates to the Municipal Commissioner, sending alert notifications.' },
+    { q: 'How does the resolution timeline work?', a: 'Every complaint category has a defined resolution timeline based on its priority.' },
     { q: 'Can I reopen a closed complaint after officer verification?', a: 'Yes! If the physical repair is unstable or completed poorly, you have a 3-day window post-resolution to upload fresh photos and reopen the case.' }
   ];
 
@@ -839,16 +808,13 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
             {[
               { title: 'Report New Complaint', desc: 'Register a new civic issue with geolocations & photos.', icon: 'bi-megaphone', target: 'submit', color: 'border-success hover-success' },
               { title: 'Track Complaint', desc: 'Lookup existing complaint lifecycle & officer remarks.', icon: 'bi-compass', target: 'track', color: 'border-primary hover-primary' },
-              { title: 'Reopen Complaint', desc: 'Reopen cases marked completed with fake/unstable proofs.', icon: 'bi-arrow-counterclockwise', target: 'reopen', color: 'border-warning hover-warning' },
-              { title: 'Emergency Civic Issue', desc: 'Critical alerts (overflows, leaks, open manholes).', icon: 'bi-exclamation-triangle-fill', target: 'emergency', color: 'border-danger hover-danger' }
+              { title: 'Reopen Complaint', desc: 'Reopen cases marked completed with fake/unstable proofs.', icon: 'bi-arrow-counterclockwise', target: 'reopen', color: 'border-warning hover-warning' }
             ].map((act, idx) => (
               <div className="col-sm-6 col-lg-3" key={idx}>
                 <div 
                   className={`card rc-card border border-light p-3 shadow-sm cursor-pointer h-100 d-flex flex-column justify-content-between ${act.color}`}
                   onClick={() => {
-                    if (act.target === 'emergency' && setActivePage) {
-                      setActivePage('Emergency');
-                    } else if (act.target === 'track' && setActivePage) {
+                    if (act.target === 'track' && setActivePage) {
                       setActivePage('Track Complaint');
                     } else {
                       setActiveSection(act.target);
@@ -875,37 +841,6 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Emergency Alert Panel */}
-        {activeSection === 'emergency' && (
-          <div className="card border border-danger border-opacity-25 rounded-4 p-4 mb-4 text-start shadow-sm animate-slide-up" style={{ background: 'linear-gradient(90deg, rgba(254, 242, 242, 0.6) 0%, rgba(255, 255, 255, 0.95) 100%)' }}>
-            <div className="d-flex align-items-start gap-3">
-              <div className="bg-danger text-white rounded-circle p-2.5 d-flex align-items-center justify-content-center animate-pulse" style={{ width: '48px', height: '48px' }}>
-                <i className="bi bi-exclamation-octagon fs-4"></i>
-              </div>
-              <div className="flex-grow-1">
-                <h5 className="fw-bold text-danger mb-1">Emergency Civic Warning Desk</h5>
-                <p className="text-muted small mb-3" style={{ lineHeight: '1.5' }}>
-                  Critical municipal breakdowns (Sewer overflows, dangerous open manholes, active dead animal pickups, live water leakage and electrical safety exposures) bypass standard queues. They are automatically marked high-priority and routed to emergency crews.
-                </p>
-                <button 
-                  onClick={() => {
-                    if (setActivePage) {
-                      setActivePage('Emergency');
-                    } else {
-                      setActiveSection('submit'); 
-                      setCurrentStep(3); 
-                      setFormData(prev => ({ ...prev, category: 'Drainage / Sewer', subcategory: 'Open manhole' }));
-                    }
-                  }} 
-                  className="btn btn-danger text-white py-2 px-3 small rounded-3 fw-bold"
-                >
-                  Open Emergency Quick Form Now
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1280,25 +1215,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                   {currentStep === 3 && (
                     <div className="animate-fade-in">
                       <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h6 className="fw-bold text-secondary m-0">3. Category Selection & Voice description</h6>
-                        
-                        {/* Live voice note speech tool */}
-                        <button 
-                          onClick={triggerVoiceRecord} 
-                          disabled={isRecording}
-                          className={`btn ${isRecording ? 'btn-danger animate-pulse' : 'btn-outline-primary'} btn-sm rounded-pill px-3 py-1.5 fw-bold transition-all shadow-sm`}
-                        >
-                          <i className="bi bi-mic-fill me-1 animate-pulse"></i> 
-                          {isRecording ? `Recording voice... 00:0${recordSeconds}s` : 'Record Issue Voice'}
-                        </button>
+                        <h6 className="fw-bold text-secondary m-0">3. Category Selection & Description</h6>
                       </div>
-
-                      {isRecording && (
-                        <div className="alert alert-info border-0 p-3 rounded-3 mb-4 d-flex align-items-center gap-2 animate-fade-in">
-                          <div className="spinner-grow text-primary spinner-grow-sm" role="status"></div>
-                          <span className="text-secondary small fw-bold" style={{ fontSize: '0.68rem' }}>Speech-to-Text active: Speak clearly into your mic...</span>
-                        </div>
-                      )}
 
                       {/* Categories Selector grid */}
                       <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center justify-content-between">
@@ -1636,10 +1554,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                     </span>
                   </div>
                   <div className="p-2.5 rounded-3 bg-light border border-light">
-                    <span className="text-muted d-block small">Escalation Authority Rule</span>
-                    <strong className="text-danger small" style={{ fontSize: '0.7rem' }}>
-                      Ward Officer <i className="bi bi-arrow-right"></i> Dept Head <i className="bi bi-arrow-right"></i> Commissioner
-                    </strong>
+                    <span className="text-muted d-block small">Supervising Authority</span>
+                    <strong className="text-primary small" style={{ fontSize: '0.7rem' }}>Department Nodal Officer</strong>
                   </div>
                 </div>
               </div>
@@ -1826,7 +1742,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                       {/* Active Ticking SLA countdown box */}
                       <span className="badge bg-danger-soft text-danger border border-danger border-opacity-10 py-2 px-3 rounded-pill fw-bold small">
                         <i className="bi bi-clock-history me-1 animate-pulse"></i>
-                        SLA ESCALATION IN: {formatCountdown(countdownSeconds)}
+                        SLA DUE IN: {formatCountdown(countdownSeconds)}
                       </span>
                     </div>
 
@@ -1920,14 +1836,14 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                       </div>
                     </div>
 
-                    {/* D. Department & E. Worker Assignment Panel */}
+                    {/* D. Department Assignment Panel */}
                     <div className="row g-3.5 text-start mb-4">
                       
                       {/* D & E details */}
                       <div className="col-md-6">
                         <div className="card border-0 p-3 bg-white border border-light rounded-3 h-100 shadow-xxs">
                           <strong className="text-secondary small d-block mb-3 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
-                            <i className="bi bi-shield-shaded text-primary"></i> D & E. Assigned Administration & Crew
+                            <i className="bi bi-shield-shaded text-primary"></i> Assigned Administration
                           </strong>
                           
                           <div className="d-flex flex-column gap-3 small">
@@ -1941,24 +1857,13 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                               </div>
                             </div>
 
-                            <div className="d-flex align-items-start gap-2 border-bottom pb-2">
+                            <div className="d-flex align-items-start gap-2">
                               <div className="bg-success-soft text-success rounded-circle p-1.5 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
                                 <i className="bi bi-person-fill-check"></i>
                               </div>
                               <div>
                                 <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Supervising Officer</span>
                                 <strong className="text-secondary">{trackingResult.officer}</strong>
-                              </div>
-                            </div>
-
-                            <div className="d-flex align-items-start gap-2">
-                              <div className="bg-info-soft text-info rounded-circle p-1.5 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
-                                <i className="bi bi-truck"></i>
-                              </div>
-                              <div>
-                                <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Assigned Field Crew Leader</span>
-                                <strong className="text-secondary">{trackingResult.worker}</strong>
-                                <span className="text-muted d-block text-xxs" style={{ fontSize: '0.65rem' }}>Status: **{trackingResult.workerStatus}** (Contact number masked for privacy).</span>
                               </div>
                             </div>
                           </div>
@@ -2021,7 +1926,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                                 ) : (
                                   <>
                                     <i className="bi bi-patch-check-fill text-success fs-3 opacity-35 mb-1 d-block position-relative z-1"></i>
-                                    <span className="text-muted d-block text-xxs position-relative z-1" style={{ fontSize: '0.55rem' }}>Worker Completion Upload</span>
+                                    <span className="text-muted d-block text-xxs position-relative z-1" style={{ fontSize: '0.55rem' }}>Resolution Proof Upload</span>
                                   </>
                                 )}
                               </div>
@@ -2155,7 +2060,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                           <option value="Wrong location work">Wrong location work</option>
                           <option value="Fake completion proof">Fake completion proof</option>
                           <option value="Temporary solution">Temporary solution</option>
-                          <option value="Worker did not visit">Worker did not visit</option>
+                          <option value="Issue unresolved on site">Issue unresolved on site</option>
                           <option value="Problem repeated again">Problem repeated again</option>
                         </select>
                       </div>

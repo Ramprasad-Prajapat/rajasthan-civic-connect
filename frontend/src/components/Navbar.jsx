@@ -1,119 +1,71 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Logo from './Logo';
 
-export default function Navbar({ activePage, setActivePage, setSelectedReportTab, authenticatedUser, handleSignOut, setAuthViewMode }) {
+export default function Navbar({
+  activePage,
+  setActivePage,
+  authenticatedUser,
+  handleSignOut,
+  setAuthViewMode
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
+  const profileDropdownRef = useRef(null);
   const mobileProfileDropdownRef = useRef(null);
-  const desktopProfileDropdownRef = useRef(null);
-  const reportsDropdownRef = useRef(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event) {
-      const isMobileProfileClick = mobileProfileDropdownRef.current && mobileProfileDropdownRef.current.contains(event.target);
-      const isDesktopProfileClick = desktopProfileDropdownRef.current && desktopProfileDropdownRef.current.contains(event.target);
-      if (!isMobileProfileClick && !isDesktopProfileClick) {
+      const isMobileClick = mobileProfileDropdownRef.current && mobileProfileDropdownRef.current.contains(event.target);
+      const isDesktopClick = profileDropdownRef.current && profileDropdownRef.current.contains(event.target);
+      if (!isMobileClick && !isDesktopClick) {
         setProfileDropdownOpen(false);
-      }
-
-      if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(event.target)) {
-        setReportsDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const menuItems = [
-    { name: 'Home', icon: 'bi-house-door-fill' },
-    { name: 'Complaint', icon: 'bi-pencil-square' },
-    { name: 'Track Complaint', icon: 'bi-geo-alt-fill' },
-    { name: 'Reports', icon: 'bi-bar-chart-line-fill' },
-    { name: 'Helpdesk', icon: 'bi-headset' },
-    { name: 'Emergency', icon: 'bi-lightning-charge-fill', isEmergency: true }
-  ];
+  const role = (authenticatedUser?.role || '').toLowerCase();
+  const portal = (authenticatedUser?.portal || '').toLowerCase();
+  const isAdmin = portal === 'admin' || role.includes('admin');
+  const isOfficer = portal === 'department' || role.includes('officer');
+  const isCitizen = !isAdmin && !isOfficer && !!authenticatedUser;
 
   const getRoleBadge = () => {
-    if (!authenticatedUser) return { label: 'Guest', style: { backgroundColor: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' } };
-    const portal = authenticatedUser.portal;
-    const roleLower = authenticatedUser.role?.toLowerCase() || '';
-    
-    if (portal === 'admin' || roleLower.includes('super') || roleLower.includes('system')) {
-      return { label: 'Admin', style: { backgroundColor: '#fef2f2', color: '#dc2626', borderColor: '#fca5a5' } };
-    } else if (portal === 'department') {
-      if (roleLower.includes('worker') || roleLower.includes('field')) {
-        return { label: 'Worker', style: { backgroundColor: '#eff6ff', color: '#2563eb', borderColor: '#93c5fd' } };
-      } else {
-        return { label: 'Officer', style: { backgroundColor: '#fffbeb', color: '#d97706', borderColor: '#fcd34d' } };
-      }
-    }
-    return { label: 'Citizen', style: { backgroundColor: '#f0fdf4', color: '#16a34a', borderColor: '#86efac' } };
+    if (!authenticatedUser) return { label: 'Guest', style: { backgroundColor: '#f1f5f9', color: '#64748b' } };
+    if (isAdmin) return { label: 'Admin', style: { backgroundColor: '#fef2f2', color: '#dc2626' } };
+    if (isOfficer) return { label: 'Officer', style: { backgroundColor: '#fffbeb', color: '#d97706' } };
+    return { label: 'Citizen', style: { backgroundColor: '#f0fdf4', color: '#16a34a' } };
   };
 
-  const getDropdownOptions = () => {
-    if (!authenticatedUser) return [];
-    const portal = authenticatedUser.portal;
-    const roleLower = authenticatedUser.role?.toLowerCase() || '';
-    
-    if (portal === 'admin' || roleLower.includes('super') || roleLower.includes('system')) {
+  const navItems = () => {
+    if (isAdmin) {
       return [
-        { label: 'My Profile', icon: 'bi-person-circle', page: 'Profile' },
-        { label: 'Admin Dashboard', icon: 'bi-grid-1x2-fill', page: 'Dashboards' },
-        { label: 'Analytics', icon: 'bi-bar-chart-fill', page: 'Reports' },
-        { label: 'User Management', icon: 'bi-people-fill', page: 'Users' },
-        { label: 'Reports', icon: 'bi-file-earmark-spreadsheet-fill', page: 'Reports' },
-        { label: 'Settings', icon: 'bi-gear-fill', page: 'Settings' }
-      ];
-    } else if (portal === 'department') {
-      if (roleLower.includes('worker') || roleLower.includes('field')) {
-        return [
-          { label: 'My Profile', icon: 'bi-person-circle', page: 'Profile' },
-          { label: 'Worker Dashboard', icon: 'bi-grid-1x2-fill', page: 'Dashboards' },
-          { label: 'Assigned Tasks', icon: 'bi-card-checklist', page: 'Complaints' },
-          { label: 'Notifications', icon: 'bi-bell-fill', page: 'Notifications' }
-        ];
-      } else {
-        return [
-          { label: 'My Profile', icon: 'bi-person-circle', page: 'Profile' },
-          { label: 'Department Dashboard', icon: 'bi-grid-1x2-fill', page: 'Dashboards' },
-          { label: 'Assigned Complaints', icon: 'bi-clipboard-check-fill', page: 'Complaints' },
-          { label: 'Reports', icon: 'bi-file-earmark-bar-graph-fill', page: 'Reports' },
-          { label: 'Notifications', icon: 'bi-bell-fill', page: 'Notifications' }
-        ];
-      }
-    } else {
-      return [
-        { label: 'My Profile', icon: 'bi-person-circle', page: 'Profile' },
-        { label: 'Dashboard', icon: 'bi-grid-1x2-fill', page: 'Dashboards' },
-        { label: 'My Complaints', icon: 'bi-file-earmark-text-fill', page: 'Complaints' },
-        { label: 'Notifications', icon: 'bi-bell-fill', page: 'Notifications' }
+        { name: 'Dashboards', label: 'Admin Dashboard', icon: 'bi-grid-1x2-fill' },
+        { name: 'Profile', label: 'Profile', icon: 'bi-person-circle' }
       ];
     }
+    if (isOfficer) {
+      return [
+        { name: 'Dashboards', label: 'Department Dashboard', icon: 'bi-grid-1x2-fill' },
+        { name: 'Profile', label: 'Profile', icon: 'bi-person-circle' }
+      ];
+    }
+    // Citizen or Guest
+    return [
+      { name: 'Home', label: 'Home', icon: 'bi-house-door-fill' },
+      { name: 'Complaint', label: 'Report Grievance', icon: 'bi-megaphone-fill' },
+      { name: 'Track Complaint', label: 'Track Ticket', icon: 'bi-geo-alt-fill' },
+      ...(isCitizen ? [{ name: 'Complaints', label: 'My Complaints', icon: 'bi-journal-text' }] : [])
+    ];
   };
 
-  const reportDropdownItems = [
-    { id: 'complaint_summary', label: 'Complaint Summary Reports', icon: 'bi-pie-chart-fill', color: 'text-success' },
-    { id: 'sla_delay', label: 'SLA Delay Reports', icon: 'bi-clock-fill', color: 'text-danger' },
-    { id: 'ward_performance', label: 'Ward Performance Reports', icon: 'bi-building-fill', color: 'text-primary' },
-    { id: 'dept_performance', label: 'Department Performance Reports', icon: 'bi-grid-fill', color: 'text-warning' },
-    { id: 'worker_performance', label: 'Worker Performance Reports', icon: 'bi-people-fill', color: 'text-info' },
-    { id: 'reopened_complaint', label: 'Reopened Complaint Reports', icon: 'bi-arrow-repeat', color: 'text-secondary' },
-    { id: 'escalation', label: 'Escalation Reports', icon: 'bi-exclamation-triangle-fill', color: 'text-danger' },
-    { id: 'emergency_issue', label: 'Emergency Issue Reports', icon: 'bi-lightning-charge-fill', color: 'text-warning' },
-    { id: 'public_feedback', label: 'Public Feedback Reports', icon: 'bi-chat-heart-fill', color: 'text-success' },
-    { id: 'audit_logs', label: 'Audit & Action Logs', icon: 'bi-journal-code', color: 'text-dark' },
-    { id: 'export_reports', label: 'Export Reports', icon: 'bi-cloud-arrow-down-fill', color: 'text-primary' }
-  ];
+  const roleBadge = getRoleBadge();
 
   return (
     <header className="fixed-top animate-fade-in shadow-sm">
-      {/* Sticky Main Navbar */}
-      <nav className="navbar navbar-expand-lg rc-navbar py-2 py-lg-3">
+      <nav className="navbar navbar-expand-lg rc-navbar py-2 py-lg-3 bg-white">
         <div className="container px-2 px-sm-3">
           {/* Logo */}
           <a
@@ -122,7 +74,7 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
             style={{ cursor: 'pointer' }}
             onClick={(e) => {
               e.preventDefault();
-              setActivePage('Home');
+              setActivePage(isAdmin || isOfficer ? 'Dashboards' : 'Home');
               setMobileMenuOpen(false);
               setProfileDropdownOpen(false);
             }}
@@ -130,413 +82,182 @@ export default function Navbar({ activePage, setActivePage, setSelectedReportTab
             <Logo width={40} height={40} showText={true} />
           </a>
 
-          {/* Header Mobile Action Bar (Avatar + Toggler) */}
-          <div className="d-flex align-items-center gap-2 d-lg-none ms-auto">
-            {authenticatedUser && (
-              <div ref={mobileProfileDropdownRef} className="position-relative d-inline-block">
-                <button
-                  className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
-                  style={{ 
-                    width: '38px', 
-                    height: '38px', 
-                    overflow: 'hidden', 
-                    outline: 'none',
-                    boxShadow: profileDropdownOpen ? '0 0 0 3px rgba(16, 185, 129, 0.3)' : 'none'
-                  }}
-                  onClick={() => {
-                    setProfileDropdownOpen(!profileDropdownOpen);
-                  }}
-                  aria-label="User profile menu"
-                >
-                  {authenticatedUser.photoURL ? (
-                    <img 
-                      src={authenticatedUser.photoURL} 
-                      alt={authenticatedUser.displayName || authenticatedUser.name} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div 
-                      className="w-100 h-100 d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" 
-                      style={{ 
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                        fontSize: '1rem',
-                        borderRadius: '50%'
-                      }}
-                    >
-                      {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </button>
+          {/* Role Badge (Desktop) */}
+          <span
+            className="badge rounded-pill px-3 py-1.5 fw-bold d-none d-lg-inline-block me-3 border"
+            style={{ fontSize: '0.72rem', ...roleBadge.style }}
+          >
+            {roleBadge.label}
+          </span>
 
-                {/* Mobile Header Profile Dropdown */}
-                {profileDropdownOpen && (
-                  <div 
-                    className="position-absolute bg-white rounded-4 shadow-lg p-3 border animate-fade-in text-center d-flex flex-column gap-2 animate-scale-up" 
-                    style={{ 
-                      width: '280px', 
-                      maxWidth: 'calc(100vw - 24px)',
-                      top: 'calc(100% + 8px)', 
-                      right: '0', 
-                      zIndex: 1055, 
-                      boxShadow: '0 15px 35px rgba(0,0,0,0.18)',
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      borderRadius: '16px',
-                      maxHeight: 'calc(100vh - 90px)',
-                      overflowY: 'auto'
-                    }}
-                  >
-                    <div className="d-flex flex-column align-items-center border-bottom pb-2.5 mb-1.5">
-                      {authenticatedUser.photoURL ? (
-                        <img 
-                          src={authenticatedUser.photoURL} 
-                          alt={authenticatedUser.displayName || authenticatedUser.name} 
-                          className="rounded-circle shadow-sm mb-2"
-                          style={{ width: '56px', height: '56px', objectFit: 'cover', border: '3px solid #10b981' }}
-                        />
-                      ) : (
-                        <div 
-                          className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm mb-2" 
-                          style={{ 
-                            width: '56px', 
-                            height: '56px', 
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                            fontSize: '1.4rem' 
-                          }}
-                        >
-                          {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      
-                      <strong className="text-secondary d-block fs-6 mb-0.5 text-truncate w-100" style={{ maxWidth: '240px' }}>
-                        {authenticatedUser.displayName || authenticatedUser.name}
-                      </strong>
-                      <span className="text-muted d-block small text-truncate mb-2" style={{ fontSize: '0.74rem', maxWidth: '240px' }}>
-                        {authenticatedUser.email}
-                      </span>
-
-                      <span 
-                        className="badge rounded-pill fw-bold px-3 py-1.5 border" 
-                        style={{ 
-                          fontSize: '0.68rem',
-                          letterSpacing: '0.03em',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                          backgroundColor: getRoleBadge().style.backgroundColor,
-                          color: getRoleBadge().style.color,
-                          borderColor: getRoleBadge().style.borderColor
-                        }}
-                      >
-                        {getRoleBadge().label}
-                      </span>
-                    </div>
-
-                    <div className="d-flex flex-column gap-1 text-start">
-                      {getDropdownOptions().map((opt, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setActivePage(opt.page);
-                            setProfileDropdownOpen(false);
-                            setMobileMenuOpen(false);
-                          }}
-                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all w-100 shadow-none"
-                          style={{ fontSize: '0.82rem', fontWeight: 550, minHeight: '44px' }}
-                        >
-                          <i className={`bi ${opt.icon} text-success fs-6`}></i>
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
-
-                      <hr className="my-1 opacity-10" />
-
-                      <button
-                        onClick={() => {
-                          if (handleSignOut) handleSignOut();
-                          setProfileDropdownOpen(false);
-                          setMobileMenuOpen(false);
-                        }}
-                        className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100 shadow-none"
-                        style={{ fontSize: '0.85rem', fontWeight: 600, minHeight: '44px' }}
-                      >
-                        <i className="bi bi-box-arrow-right text-danger fs-5 me-1"></i>
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Mobile Toggler Button */}
-            <button
-              className="navbar-toggler border-0 shadow-none p-1"
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-controls="navbarNav"
-              aria-expanded={mobileMenuOpen}
-              aria-label="Toggle navigation"
-            >
-              <span className="navbar-toggler-icon"></span>
-            </button>
-          </div>
-
-          {/* Menu Items encapsulated in single circular border pill container */}
-          <div className={`collapse navbar-collapse ${mobileMenuOpen ? 'show' : ''}`} id="navbarNav">
-            <div className="mx-auto my-2 my-lg-0 px-lg-2">
-              <div className="rc-nav-pill-wrapper d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center flex-nowrap p-1.5 p-lg-1 bg-white bg-opacity-90 rounded-4 rounded-lg-pill border border-light-subtle shadow-sm">
-                <ul className="navbar-nav d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center flex-nowrap m-0 p-0 gap-1 gap-lg-1 w-100 list-unstyled">
-                  {menuItems.map((item) => {
-                    const itemName = typeof item === 'string' ? item : item.name;
-                    const itemIcon = typeof item === 'string' ? null : item.icon;
-                    const isEmergency = item.isEmergency;
-                    const isActive = activePage === itemName;
-
-                    if (itemName === 'Reports') {
-                      return (
-                        <li
-                          ref={reportsDropdownRef}
-                          className="nav-item position-relative"
-                          key={itemName}
-                          onMouseEnter={() => window.innerWidth >= 992 && setReportsDropdownOpen(true)}
-                          onMouseLeave={() => window.innerWidth >= 992 && setReportsDropdownOpen(false)}
-                        >
-                          <a
-                            className={`nav-link rc-nav-pill-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1.5 dropdown-toggle ${isActive ? 'active' : ''}`}
-                            href="#reports"
-                            style={{ cursor: 'pointer' }}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setReportsDropdownOpen(!reportsDropdownOpen);
-                            }}
-                          >
-                            {itemIcon && <i className={`bi ${itemIcon} rc-pill-icon`}></i>}
-                            <span>Reports</span>
-                          </a>
-
-                          {/* Reports Dropdown Box */}
-                          {reportsDropdownOpen && (
-                            <div
-                              className="position-absolute bg-white rounded-4 shadow-lg p-2 border animate-fade-in text-start d-flex flex-column gap-1"
-                              style={{
-                                width: window.innerWidth < 992 ? '100%' : '260px',
-                                maxWidth: 'calc(100vw - 32px)',
-                                top: 'calc(100% + 8px)',
-                                left: window.innerWidth < 992 ? '0' : '50%',
-                                transform: window.innerWidth < 992 ? 'none' : 'translateX(-50%)',
-                                zIndex: 1050,
-                                maxHeight: '340px',
-                                overflowY: 'auto',
-                                boxShadow: '0 12px 30px rgba(0,0,0,0.12)'
-                              }}
-                            >
-                              <span className="text-muted text-uppercase fw-extrabold d-block mb-1.5 px-2.5 pt-1.5" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>
-                                Municipal Ledgers
-                              </span>
-                              {reportDropdownItems.map((subItem) => (
-                                <button
-                                  key={subItem.id}
-                                  onClick={() => {
-                                    setSelectedReportTab(subItem.id);
-                                    setActivePage('Reports');
-                                    setReportsDropdownOpen(false);
-                                    setMobileMenuOpen(false);
-                                  }}
-                                  className="btn btn-sm text-start hover-light px-2.5 py-2 rounded-2 d-flex align-items-center gap-2 border-0 bg-transparent text-secondary w-100 shadow-none"
-                                  style={{ fontSize: '0.8rem', minHeight: '40px' }}
-                                >
-                                  <i className={`bi ${subItem.icon} ${subItem.color} fs-6`}></i>
-                                  <span>{subItem.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    }
-
-                    return (
-                      <li className="nav-item" key={itemName}>
-                        <a
-                          className={`nav-link rc-nav-pill-link d-flex align-items-center justify-content-center justify-content-lg-start gap-1.5 ${isActive ? 'active' : ''} ${isEmergency && !isActive ? 'rc-emergency-pill' : ''}`}
-                          href={`#${itemName.toLowerCase().replace(/\s+/g, '-')}`}
-                          style={{ cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setActivePage(itemName);
-                            setMobileMenuOpen(false);
-                            setProfileDropdownOpen(false);
-                          }}
-                        >
-                          {itemIcon && <i className={`bi ${itemIcon} rc-pill-icon`}></i>}
-                          <span>{itemName}</span>
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
-
-            {/* Desktop CTA & Profile Button */}
-            <div className="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3 mt-lg-0">
-              {authenticatedUser ? (
-                <div 
-                  ref={desktopProfileDropdownRef}
-                  className="d-inline-block position-relative"
-                >
+          {/* Desktop Nav Items */}
+          <div className="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
+            <ul className="navbar-nav me-auto mb-2 mb-lg-0 gap-1">
+              {navItems().map(item => (
+                <li className="nav-item" key={item.name}>
                   <button
-                    className="btn p-0 rounded-circle border-0 d-flex align-items-center justify-content-center transition-all"
-                    style={{ 
-                      width: '42px', 
-                      height: '42px', 
-                      overflow: 'hidden', 
-                      outline: 'none',
-                      boxShadow: profileDropdownOpen ? '0 0 0 3px rgba(16, 185, 129, 0.3)' : 'none'
-                    }}
-                    onClick={() => {
-                      setProfileDropdownOpen(!profileDropdownOpen);
-                    }}
-                    aria-label="User menu"
+                    className={`nav-link rc-nav-link btn btn-link border-0 text-decoration-none px-3 py-2 small fw-semibold ${activePage === item.name ? 'active text-primary fw-bold' : 'text-secondary'}`}
+                    onClick={() => setActivePage(item.name)}
                   >
-                    {authenticatedUser.photoURL ? (
-                      <img 
-                        src={authenticatedUser.photoURL} 
-                        alt={authenticatedUser.displayName || authenticatedUser.name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div 
-                        className="w-100 h-100 d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" 
-                        style={{ 
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                          fontSize: '1.15rem',
-                          borderRadius: '50%'
-                        }}
-                      >
-                        {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
-                      </div>
-                    )}
+                    <i className={`bi ${item.icon} me-1.5`}></i>
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop Auth Section */}
+            <div className="d-flex align-items-center gap-2">
+              {authenticatedUser ? (
+                <div className="position-relative" ref={profileDropdownRef}>
+                  <button
+                    className="btn btn-light rounded-pill px-3 py-1.5 border d-flex align-items-center gap-2"
+                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  >
+                    <span className="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center fw-bold" style={{ width: '28px', height: '28px', fontSize: '0.8rem' }}>
+                      {(authenticatedUser.name?.[0] || authenticatedUser.email?.[0] || 'U').toUpperCase()}
+                    </span>
+                    <span className="small fw-semibold text-secondary">
+                      {authenticatedUser.name || authenticatedUser.fullName || authenticatedUser.email}
+                    </span>
+                    <i className="bi bi-chevron-down small text-muted"></i>
                   </button>
 
-                  {/* Desktop Dropdown Box */}
                   {profileDropdownOpen && (
-                    <div 
-                      className="position-absolute bg-white rounded-4 shadow-lg p-3 border animate-fade-in text-center d-flex flex-column gap-2 animate-scale-up" 
-                      style={{ 
-                        width: '280px', 
-                        maxWidth: 'calc(100vw - 24px)',
-                        top: 'calc(100% + 8px)', 
-                        right: '0', 
-                        zIndex: 1055, 
-                        boxShadow: '0 15px 35px rgba(0,0,0,0.18)',
-                        border: '1px solid rgba(0,0,0,0.08)',
-                        borderRadius: '16px',
-                        maxHeight: 'calc(100vh - 90px)',
-                        overflowY: 'auto'
-                      }}
-                    >
-                      <div className="d-flex flex-column align-items-center border-bottom pb-3 mb-2">
-                        {authenticatedUser.photoURL ? (
-                          <img 
-                            src={authenticatedUser.photoURL} 
-                            alt={authenticatedUser.displayName || authenticatedUser.name} 
-                            className="rounded-circle shadow-sm mb-2"
-                            style={{ width: '64px', height: '64px', objectFit: 'cover', border: '3px solid #10b981' }}
-                          />
-                        ) : (
-                          <div 
-                            className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm mb-2" 
-                            style={{ 
-                              width: '64px', 
-                              height: '64px', 
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                              fontSize: '1.6rem' 
-                            }}
-                          >
-                            {(authenticatedUser.displayName || authenticatedUser.name || 'U')[0]?.toUpperCase()}
-                          </div>
-                        )}
-                        
-                        <strong className="text-secondary d-block fs-6 mb-0.5 text-truncate w-100" style={{ maxWidth: '240px' }}>
-                          {authenticatedUser.displayName || authenticatedUser.name}
-                        </strong>
-                        <span className="text-muted d-block small text-truncate mb-2.5" style={{ fontSize: '0.74rem', maxWidth: '240px' }}>
-                          {authenticatedUser.email}
-                        </span>
-
-                        <span 
-                          className="badge rounded-pill fw-bold px-3 py-1.5 border" 
-                          style={{ 
-                            fontSize: '0.68rem',
-                            letterSpacing: '0.03em',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                            backgroundColor: getRoleBadge().style.backgroundColor,
-                            color: getRoleBadge().style.color,
-                            borderColor: getRoleBadge().style.borderColor
-                          }}
-                        >
-                          {getRoleBadge().label}
-                        </span>
+                    <div className="dropdown-menu dropdown-menu-end show position-absolute rounded-4 shadow border-0 p-2 mt-2" style={{ minWidth: '200px' }}>
+                      <div className="px-3 py-2 border-bottom">
+                        <span className="d-block small fw-bold text-secondary">{authenticatedUser.name || authenticatedUser.fullName}</span>
+                        <span className="d-block text-muted text-xxs text-truncate" style={{ fontSize: '0.72rem' }}>{authenticatedUser.email}</span>
                       </div>
-
-                      <div className="d-flex flex-column gap-1.5 text-start">
-                        {getDropdownOptions().map((opt, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setActivePage(opt.page);
-                              setProfileDropdownOpen(false);
-                              setMobileMenuOpen(false);
-                            }}
-                            className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-secondary transition-all w-100 shadow-none"
-                            style={{ fontSize: '0.8rem', fontWeight: 550, minHeight: '40px' }}
-                          >
-                            <i className={`bi ${opt.icon} text-success fs-6`}></i>
-                            <span>{opt.label}</span>
-                          </button>
-                        ))}
-
-                        <hr className="my-1.5 opacity-10" />
-
-                        <button
-                          onClick={() => {
-                            if (handleSignOut) handleSignOut();
-                            setProfileDropdownOpen(false);
-                            setMobileMenuOpen(false);
-                          }}
-                          className="btn btn-sm text-start hover-light px-3 py-2.5 rounded-3 d-flex align-items-center gap-2.5 border-0 bg-transparent text-danger transition-all w-100 shadow-none"
-                          style={{ fontSize: '0.82rem', fontWeight: 600, minHeight: '40px' }}
-                        >
-                          <i className="bi bi-box-arrow-right text-danger fs-6 me-1"></i>
-                          <span>Sign Out</span>
-                        </button>
-                      </div>
+                      <button
+                        className="dropdown-item py-2 small rounded-3 mt-1"
+                        onClick={() => { setActivePage('Profile'); setProfileDropdownOpen(false); }}
+                      >
+                        <i className="bi bi-person me-2"></i> My Profile
+                      </button>
+                      <button
+                        className="dropdown-item py-2 small rounded-3"
+                        onClick={() => { setActivePage('Dashboards'); setProfileDropdownOpen(false); }}
+                      >
+                        <i className="bi bi-grid me-2"></i> Dashboard
+                      </button>
+                      <div className="dropdown-divider my-1"></div>
+                      <button
+                        className="dropdown-item py-2 small rounded-3 text-danger"
+                        onClick={() => { handleSignOut(); setProfileDropdownOpen(false); }}
+                      >
+                        <i className="bi bi-box-arrow-right me-2"></i> Log Out
+                      </button>
                     </div>
                   )}
                 </div>
               ) : (
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    className="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold"
+                    onClick={() => {
+                      if (setAuthViewMode) setAuthViewMode('login');
+                      setActivePage('Login/Register');
+                    }}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+                    onClick={() => {
+                      if (setAuthViewMode) setAuthViewMode('register');
+                      setActivePage('Login/Register');
+                    }}
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Toggle Button */}
+          <button
+            className="navbar-toggler border-0 d-lg-none"
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation"
+          >
+            <i className={`bi ${mobileMenuOpen ? 'bi-x-lg' : 'bi-list'} fs-4`}></i>
+          </button>
+        </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="d-lg-none border-top px-3 py-3 bg-white w-100 animate-slide-up">
+            <div className="mb-2 pb-2 border-bottom d-flex align-items-center justify-content-between">
+              <span className="badge rounded-pill px-2.5 py-1" style={roleBadge.style}>
+                {roleBadge.label}
+              </span>
+              {authenticatedUser && (
+                <span className="small text-muted text-truncate">{authenticatedUser.email}</span>
+              )}
+            </div>
+
+            <ul className="navbar-nav gap-2 mb-3">
+              {navItems().map(item => (
+                <li className="nav-item" key={item.name}>
+                  <button
+                    className={`nav-link btn btn-link text-start w-100 py-2 small fw-semibold text-decoration-none ${activePage === item.name ? 'text-primary fw-bold' : 'text-secondary'}`}
+                    onClick={() => {
+                      setActivePage(item.name);
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <i className={`bi ${item.icon} me-2`}></i>
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {authenticatedUser ? (
+              <div className="d-flex flex-column gap-2 border-top pt-2">
                 <button
-                  className={`btn btn-sm btn-success rounded-pill px-3.5 py-1.5 fw-semibold text-white ${activePage === 'Login/Register' ? 'active' : ''}`}
+                  className="btn btn-outline-secondary btn-sm rounded-pill w-100"
+                  onClick={() => { setActivePage('Profile'); setMobileMenuOpen(false); }}
+                >
+                  <i className="bi bi-person me-1"></i> My Profile
+                </button>
+                <button
+                  className="btn btn-outline-danger btn-sm rounded-pill w-100"
+                  onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                >
+                  <i className="bi bi-box-arrow-right me-1"></i> Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="d-flex gap-2 border-top pt-2">
+                <button
+                  className="btn btn-outline-primary btn-sm rounded-pill w-50"
                   onClick={() => {
                     if (setAuthViewMode) setAuthViewMode('login');
                     setActivePage('Login/Register');
                     setMobileMenuOpen(false);
-                    setProfileDropdownOpen(false);
                   }}
                 >
-                  <i className="bi bi-box-arrow-in-right me-1"></i> Login
+                  Sign In
                 </button>
-              )}
-            </div>
+                <button
+                  className="btn btn-primary btn-sm rounded-pill w-50"
+                  onClick={() => {
+                    if (setAuthViewMode) setAuthViewMode('register');
+                    setActivePage('Login/Register');
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Register
+                </button>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </nav>
     </header>
-
   );
 }

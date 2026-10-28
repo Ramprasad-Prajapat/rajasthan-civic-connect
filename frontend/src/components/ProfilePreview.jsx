@@ -1,278 +1,251 @@
 import React, { useState } from 'react';
-import { updateUserProfile } from '../apiService';
+import { updateMyProfile, changePassword } from '../apiService';
 
 export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser, setActivePage }) {
-  // Account settings edit mode state
-  const [isEditing, setIsEditing] = useState(false);
-  const [fullName, setFullName] = useState(authenticatedUser?.name || authenticatedUser?.displayName || 'Ram Prasad');
-  const [mobileNumber, setMobileNumber] = useState(authenticatedUser?.phoneNumber || '+91 98290 88721');
-  const [activeWard, setActiveWard] = useState(authenticatedUser?.ward || 'Ward No. 12');
-  const [activeULB, setActiveULB] = useState(authenticatedUser?.ulb || 'Jaipur Greater Municipal Corporation');
-  const [photoFile, setPhotoFile] = useState(null);
+  const [fullName, setFullName] = useState(authenticatedUser?.name || authenticatedUser?.fullName || '');
+  const [phoneNumber, setPhoneNumber] = useState(authenticatedUser?.phone || '');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
-  const [successToast, setSuccessToast] = useState(null);
+  // Change Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
-  const triggerToast = (msg) => {
-    setSuccessToast(msg);
-    setTimeout(() => setSuccessToast(null), 3000);
+  // Alerts
+  const [alert, setAlert] = useState(null);
+
+  const showAlert = (type, text) => {
+    setAlert({ type, text });
+    setTimeout(() => setAlert(null), 4000);
   };
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
-    if (!authenticatedUser) return;
-    
+    setProfileLoading(true);
     try {
-      const uid = authenticatedUser.uid || authenticatedUser.email;
-      const profileData = {
-        name: fullName,
-        fullName: fullName,
-        displayName: fullName,
-        phone: mobileNumber,
-        phoneNumber: mobileNumber,
-        ward: activeWard,
-        ulb: activeULB
-      };
-
-      const updatedURL = await updateUserProfile(uid, profileData, photoFile);
-      
+      const updated = await updateMyProfile({ name: fullName, phone: phoneNumber });
       if (setAuthenticatedUser) {
         setAuthenticatedUser({
           ...authenticatedUser,
-          ...profileData,
-          photoURL: updatedURL || authenticatedUser.photoURL
+          name: updated.name || fullName,
+          fullName: updated.name || fullName,
+          phone: updated.phone || phoneNumber
         });
       }
-      setIsEditing(false);
-      triggerToast("Your profile records have been securely updated in the database!");
+      setIsEditingProfile(false);
+      showAlert('success', 'Profile updated successfully!');
     } catch (err) {
-      console.error("Failed to update profile in database:", err);
-      alert("Failed to save changes: " + err.message);
+      showAlert('danger', err.message || 'Failed to update profile');
+    } finally {
+      setProfileLoading(false);
     }
   };
 
-  const handleCancelEdit = () => {
-    setFullName(authenticatedUser?.name || authenticatedUser?.displayName || 'Ram Prasad');
-    setMobileNumber(authenticatedUser?.phoneNumber || '+91 98290 88721');
-    setActiveWard(authenticatedUser?.ward || 'Ward No. 12');
-    setActiveULB(authenticatedUser?.ulb || 'Jaipur Greater Municipal Corporation');
-    setIsEditing(false);
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      showAlert('danger', 'New passwords do not match');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      showAlert('success', 'Password changed successfully!');
+    } catch (err) {
+      showAlert('danger', err.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
-    <section className="py-5" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', minHeight: '100vh' }}>
-      
-      {/* Toast Alert */}
-      {successToast && (
-        <div className="position-fixed top-0 end-0 p-3" style={{ zIndex: 1100 }}>
-          <div className="alert alert-success border-0 shadow-lg rounded-4 p-3 d-flex align-items-center gap-3 animate-slide-up" style={{ minWidth: '320px', borderLeft: '4px solid #10b981' }}>
-            <div className="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
-              <i className="bi bi-check2-circle fs-5"></i>
-            </div>
-            <div>
-              <strong className="text-secondary small d-block">Secure Profile Hub</strong>
-              <span className="text-muted" style={{ fontSize: '0.72rem' }}>{successToast}</span>
-            </div>
+    <div className="container py-5">
+      <div className="row justify-content-center">
+        <div className="col-12 col-md-8 col-lg-7">
+          {/* Header */}
+          <div className="text-center mb-4 text-start">
+            <span className="badge bg-success-soft text-success rounded-pill px-3 py-1.5 mb-2 fw-bold" style={{ fontSize: '0.7rem' }}>
+              <i className="bi bi-person-badge me-1"></i> USER ACCOUNT
+            </span>
+            <h2 className="fw-bold text-secondary mb-1">My Profile</h2>
+            <p className="text-muted small">
+              Manage your personal details and account credentials.
+            </p>
           </div>
-        </div>
-      )}
 
-      <div className="container py-4">
-        
-        {/* Header */}
-        <div className="text-center mb-5 text-start">
-          <span className="badge bg-success-soft text-success rounded-pill px-3 py-1.5 mb-2 fw-bold" style={{ fontSize: '0.7rem' }}>
-            <i className="bi bi-shield-lock-fill me-1"></i> SECURE IDENTITY SYSTEM
-          </span>
-          <h2 className="fw-extrabold text-secondary m-0" style={{ fontSize: '2rem' }}>My Official Profile</h2>
-          <p className="text-muted small mt-1.5" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            Manage your verified contact details, localized sector ward, and government authorization parameters.
-          </p>
-        </div>
+          {alert && (
+            <div className={`alert alert-${alert.type} rounded-4 shadow-sm mb-4 d-flex align-items-center gap-2`}>
+              <i className="bi bi-info-circle-fill fs-5"></i>
+              <div>{alert.text}</div>
+            </div>
+          )}
 
-        <div className="row justify-content-center">
-          <div className="col-lg-8 col-md-10">
-            <div className="card border-0 rounded-4 shadow-sm p-4 p-md-5 bg-white text-start">
-              
-              {/* Profile Image & Avatar */}
-              <div className="d-flex flex-column flex-sm-row align-items-center gap-4 border-bottom pb-4 mb-4">
-                {authenticatedUser?.photoURL ? (
-                  <img 
-                    src={authenticatedUser.photoURL} 
-                    alt={fullName} 
-                    className="rounded-circle shadow-sm"
-                    style={{ width: '96px', height: '96px', objectFit: 'cover', border: '4px solid #10b981' }}
-                  />
-                ) : (
-                  <div 
-                    className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" 
-                    style={{ 
-                      width: '96px', 
-                      height: '96px', 
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                      fontSize: '2.5rem' 
-                    }}
-                  >
-                    {fullName[0]?.toUpperCase()}
-                  </div>
+          {/* Card 1: Profile Information */}
+          <div className="card rc-card border-0 rounded-4 shadow-sm p-4 p-md-5 bg-white text-start mb-4">
+            <div className="d-flex align-items-center gap-3 mb-4 border-bottom pb-4">
+              <div
+                className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  fontSize: '1.8rem'
+                }}
+              >
+                {(fullName[0] || authenticatedUser?.email[0] || 'U').toUpperCase()}
+              </div>
+              <div>
+                <h4 className="fw-bold text-secondary mb-0">{fullName || 'User'}</h4>
+                <span className="text-muted small d-block">{authenticatedUser?.email}</span>
+                <span className="badge bg-primary text-white rounded-pill px-2.5 py-1 small mt-1">
+                  {authenticatedUser?.role || 'Citizen'}
+                </span>
+                {authenticatedUser?.departmentName && (
+                  <span className="badge bg-warning text-dark rounded-pill px-2.5 py-1 small ms-1 mt-1">
+                    {authenticatedUser.departmentName}
+                  </span>
                 )}
-                <div className="text-center text-sm-start">
-                  <h4 className="fw-extrabold text-secondary mb-1">{fullName}</h4>
-                  <p className="text-muted small mb-2">{authenticatedUser?.email || 'authenticated.user@rajasthan.in'}</p>
-                  
-                  {isEditing && (
-                    <div className="mb-2">
-                      <label className="form-label text-secondary small fw-bold d-block mb-1" style={{ fontSize: '0.74rem' }}>Upload Avatar Proof</label>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="form-control form-control-sm" 
-                        style={{ maxWidth: '250px', fontSize: '0.76rem' }}
-                        onChange={e => setPhotoFile(e.target.files[0])}
-                      />
+              </div>
+            </div>
+
+            <form onSubmit={handleProfileSave}>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-secondary mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-light"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    disabled={!isEditingProfile}
+                    required
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-secondary mb-1">Email (Permanent)</label>
+                  <input
+                    type="email"
+                    className="form-control form-control-sm bg-light text-muted"
+                    value={authenticatedUser?.email || ''}
+                    disabled
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-secondary mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    className="form-control form-control-sm bg-light"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    disabled={!isEditingProfile}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-secondary mb-1">Account Role</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-light text-muted"
+                    value={authenticatedUser?.role || 'Citizen'}
+                    disabled
+                  />
+                </div>
+
+                <div className="col-12 text-end mt-3">
+                  {!isEditingProfile ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm rounded-pill px-4"
+                      onClick={() => setIsEditingProfile(true)}
+                    >
+                      <i className="bi bi-pencil me-1"></i> Edit Details
+                    </button>
+                  ) : (
+                    <div className="d-flex justify-content-end gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm rounded-pill px-3"
+                        onClick={() => setIsEditingProfile(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-sm rounded-pill px-4"
+                        disabled={profileLoading}
+                      >
+                        {profileLoading ? 'Saving...' : 'Save Profile'}
+                      </button>
                     </div>
                   )}
-
-                  <span className="badge bg-success-soft text-success rounded-pill fw-bold border border-success border-opacity-10 px-3 py-1.5" style={{ fontSize: '0.68rem' }}>
-                    🟢 Verified Account Status: Active
-                  </span>
                 </div>
               </div>
+            </form>
+          </div>
 
-              {/* Form / Details View */}
-              <form onSubmit={handleProfileSave}>
-                <div className="row g-4">
-                  
-                  {/* Name field */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Full Name</label>
-                    <input 
-                      type="text" 
-                      className="form-control rounded-3 py-2 px-3 small text-secondary border"
-                      style={{ fontSize: '0.82rem' }}
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      disabled={!isEditing}
-                      required
-                    />
-                  </div>
+          {/* Card 2: Change Password Form */}
+          <div className="card rc-card border-0 rounded-4 shadow-sm p-4 p-md-5 bg-white text-start">
+            <h5 className="fw-bold text-secondary mb-1">Change Password</h5>
+            <p className="text-muted small mb-4">
+              Enter your current password and choose a new secure password.
+            </p>
 
-                  {/* Email field (Immutable) */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Email Address</label>
-                    <input 
-                      type="email" 
-                      className="form-control rounded-3 py-2 px-3 small text-secondary bg-light border"
-                      style={{ fontSize: '0.82rem' }}
-                      value={authenticatedUser?.email || 'authenticated.user@rajasthan.in'}
-                      disabled
-                    />
-                  </div>
+            <form onSubmit={handleChangePassword}>
+              <div className="mb-3">
+                <label className="form-label small fw-bold text-secondary mb-1">Current Password *</label>
+                <input
+                  type="password"
+                  className="form-control form-control-sm bg-light"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </div>
 
-                  {/* Mobile field */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Mobile Number</label>
-                    <input 
-                      type="text" 
-                      className="form-control rounded-3 py-2 px-3 small text-secondary border"
-                      style={{ fontSize: '0.82rem' }}
-                      value={mobileNumber}
-                      onChange={e => setMobileNumber(e.target.value)}
-                      disabled={!isEditing}
-                      required
-                    />
-                  </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold text-secondary mb-1">New Password *</label>
+                <input
+                  type="password"
+                  className="form-control form-control-sm bg-light"
+                  placeholder="Minimum 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
 
-                  {/* Role field (Immutable) */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Authorized Role Badge</label>
-                    <input 
-                      type="text" 
-                      className="form-control rounded-3 py-2 px-3 small text-secondary bg-light border font-monospace"
-                      style={{ fontSize: '0.82rem', textTransform: 'uppercase' }}
-                      value={authenticatedUser?.role || 'CITIZEN'}
-                      disabled
-                    />
-                  </div>
+              <div className="mb-4">
+                <label className="form-label small fw-bold text-secondary mb-1">Confirm New Password *</label>
+                <input
+                  type="password"
+                  className="form-control form-control-sm bg-light"
+                  placeholder="Repeat new password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
 
-                  {/* Ward field */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Jurisdiction Ward Sector</label>
-                    <select 
-                      className="form-select rounded-3 py-2 px-3 small text-secondary border"
-                      style={{ fontSize: '0.82rem' }}
-                      value={activeWard}
-                      onChange={e => setActiveWard(e.target.value)}
-                      disabled={!isEditing}
-                    >
-                      <option value="Ward No. 12">Ward No. 12</option>
-                      <option value="Ward No. 24">Ward No. 24</option>
-                      <option value="Ward No. 36">Ward No. 36</option>
-                    </select>
-                  </div>
-
-                  {/* ULB field */}
-                  <div className="col-md-6">
-                    <label className="form-label text-secondary small fw-bold">Urban Local Body (ULB)</label>
-                    <input 
-                      type="text" 
-                      className="form-control rounded-3 py-2 px-3 small text-secondary border"
-                      style={{ fontSize: '0.82rem' }}
-                      value={activeULB}
-                      onChange={e => setActiveULB(e.target.value)}
-                      disabled={!isEditing}
-                      required
-                    />
-                  </div>
-
-                  {/* Account Status field (Immutable) */}
-                  <div className="col-md-12">
-                    <label className="form-label text-secondary small fw-bold">Platform Status Logs</label>
-                    <div className="p-3 border rounded-3 bg-light text-muted small" style={{ fontSize: '0.74rem' }}>
-                      <span className="d-block mb-1">🛡️ <strong>Encryption:</strong> TLS 1.3 Active</span>
-                      <span className="d-block">🔑 <strong>Session Expiry:</strong> Synced with secure JWT Authentication nodes.</span>
-                    </div>
-                  </div>
-
-                  {/* Actions Bar */}
-                  <div className="col-12 mt-4 text-end">
-                    {!isEditing ? (
-                      <button 
-                        type="button" 
-                        onClick={() => setIsEditing(true)}
-                        className="btn btn-success rounded-pill px-4 py-2 bg-success border-0 fw-bold shadow-sm"
-                        style={{ fontSize: '0.8rem' }}
-                      >
-                        <i className="bi bi-pencil-fill me-1.5"></i> Edit Profile Option
-                      </button>
-                    ) : (
-                      <div className="d-flex justify-content-end gap-2">
-                        <button 
-                          type="submit" 
-                          className="btn btn-success rounded-pill px-4 py-2 bg-success border-0 fw-bold shadow-sm"
-                          style={{ fontSize: '0.8rem' }}
-                        >
-                          Save Changes
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={handleCancelEdit}
-                          className="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold"
-                          style={{ fontSize: '0.8rem' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              </form>
-
-            </div>
+              <div className="text-end">
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm rounded-pill px-4"
+                  disabled={passwordLoading}
+                >
+                  {passwordLoading ? 'Updating Password...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-
       </div>
-    </section>
+    </div>
   );
 }
