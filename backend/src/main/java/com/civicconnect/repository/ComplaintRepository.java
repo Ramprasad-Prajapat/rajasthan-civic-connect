@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Data access repository for Complaint entities with aggregate analytical queries.
+ * Data access repository for Complaint entities with department-scoped queries.
  */
 @Repository
 public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
@@ -19,6 +19,12 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     List<Complaint> findByCitizenIdOrderByCreatedAtDesc(Long citizenId);
 
+    List<Complaint> findByDepartmentIdOrderByCreatedAtDesc(Long departmentId);
+
+    List<Complaint> findByDepartmentIdAndStatusOrderByCreatedAtDesc(Long departmentId, String status);
+
+    List<Complaint> findByStatusOrderByCreatedAtDesc(String status);
+
     List<Complaint> findAllByOrderByCreatedAtDesc();
 
     @Query("SELECT c.complaintCode FROM Complaint c WHERE c.complaintCode LIKE CONCAT(:prefix, '-%') ORDER BY c.complaintCode DESC LIMIT 1")
@@ -26,18 +32,15 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     long countByCitizenId(Long citizenId);
 
-    long countByCitizenIdAndStatus(Long citizenId, String status);
+    long countByDepartmentId(Long departmentId);
+
+    long countByDepartmentIdAndStatus(Long departmentId, String status);
 
     long countByStatus(String status);
-
-    long countByIsEmergencyTrue();
 
     @Query("SELECT COUNT(c) FROM Complaint c WHERE c.slaDeadline IS NOT NULL AND c.slaDeadline < CURRENT_TIMESTAMP AND c.status NOT IN ('Resolved', 'Closed')")
     long countSlaBreaches();
 
-    @Query("SELECT c.district, COUNT(c) FROM Complaint c GROUP BY c.district")
-    List<Object[]> countByDistrictGroup();
-
-    @Query("SELECT c.departmentName, COUNT(c) FROM Complaint c GROUP BY c.departmentName")
-    List<Object[]> countByDepartmentGroup();
+    @Query("SELECT COUNT(c) FROM Complaint c WHERE c.departmentId = :deptId AND c.slaDeadline IS NOT NULL AND c.slaDeadline < CURRENT_TIMESTAMP AND c.status NOT IN ('Resolved', 'Closed')")
+    long countDepartmentSlaBreaches(@Param("deptId") Long deptId);
 }

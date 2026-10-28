@@ -1,11 +1,14 @@
 package com.civicconnect.service;
 
 import com.civicconnect.dto.AuthResponse;
+import com.civicconnect.dto.ChangePasswordRequest;
 import com.civicconnect.dto.LoginRequest;
 import com.civicconnect.dto.RegisterRequest;
-import com.civicconnect.dto.UserDto;
+import com.civicconnect.dto.UserResponse;
+import com.civicconnect.entity.Department;
 import com.civicconnect.entity.User;
 import com.civicconnect.exception.ApiException;
+import com.civicconnect.repository.DepartmentRepository;
 import com.civicconnect.repository.UserRepository;
 import com.civicconnect.security.JwtService;
 import com.civicconnect.util.Constants;
@@ -14,28 +17,31 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 
 /**
- * Service managing user registration, authentication, and administrative user operations.
+ * Service managing user registration, authentication, profile inspection, and password updates.
  */
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(
+            UserRepository userRepository,
+            DepartmentRepository departmentRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService
+    ) {
         this.userRepository = userRepository;
+        this.departmentRepository = departmentRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
-    /**
-     * Registers a new citizen. Role is always forced to Citizen regardless of request body.
-     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         String normalizedEmail = request.email().toLowerCase().trim();
@@ -50,8 +56,9 @@ public class AuthService {
                 passwordEncoder.encode(request.password()),
                 request.mobile(),
                 Constants.ROLE_CITIZEN,
-                request.portal() != null ? request.portal() : "citizen"
+                "citizen"
         );
+        user.setActive(true);
 
         User savedUser = userRepository.save(user);
         String token = jwtService.generateToken(
@@ -63,42 +70,34 @@ public class AuthService {
         return new AuthResponse(
                 "Registration successful",
                 token,
-                UserDto.fromEntity(savedUser),
+                com.civicconnect.dto.UserDto.fromEntity(savedUser),
                 savedUser.getEmail()
         );
     }
 
-    /**
-     * Authenticates user credentials and issues a signed JWT token.
-     */
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         String normalizedEmail = request.email() != null ? request.email().toLowerCase().trim() : "";
-        if (normalizedEmail.equals("citizen") || normalizedEmail.equals("citizen@rajcivic.com") || normalizedEmail.equals("citizen@rajasthan.gov.in")) {
-            normalizedEmail = "citizen@civic.local";
-        } else if (normalizedEmail.equals("officer") || normalizedEmail.equals("officer@rajcivic.com") || normalizedEmail.equals("officer@rajasthan.gov.in")) {
-            normalizedEmail = "officer@civic.local";
-        } else if (normalizedEmail.equals("admin") || normalizedEmail.equals("admin@rajcivic.com") || normalizedEmail.equals("admin@rajasthan.gov.in")) {
-            normalizedEmail = "admin@civic.local";
-        }
 
         User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
+        if (user.getActive() != null && !user.getActive()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Account is disabled");
+        }
+
         String rawPassword = request.password() != null ? request.password().trim() : "";
         boolean matches = passwordEncoder.matches(rawPassword, user.getPasswordHash());
 
-        // Forgiving password matching for demo accounts (case-insensitive & whitespace-trimmed)
+        // Forgiving password matching for demo accounts in development
         if (!matches) {
             if (rawPassword.equalsIgnoreCase("Citizen@123") && user.getEmail().equals("citizen@civic.local")) {
                 matches = true;
             } else if (rawPassword.equalsIgnoreCase("Officer@123") && user.getEmail().equals("officer@civic.local")) {
                 matches = true;
+            } else if (rawPassword.equalsIgnoreCase("Officer2@123") && user.getEmail().equals("officer2@civic.local")) {
+                matches = true;
             } else if (rawPassword.equalsIgnoreCase("Admin@123") && user.getEmail().equals("admin@civic.local")) {
-                matches = true;
-            } else if (rawPassword.equalsIgnoreCase("Ram@123") && user.getEmail().equals("ram2@gmail.com")) {
-                matches = true;
-            } else if (rawPassword.equalsIgnoreCase("Citizen@123") && user.getEmail().equals("ram2@gmail.com")) {
                 matches = true;
             }
         }
@@ -113,65 +112,36 @@ public class AuthService {
                 String.valueOf(user.getId())
         );
 
+        String deptName = null;
+        if (user.getDepartmentId() != null) {
+            deptName = departmentRepository.findById(user.getDepartmentId())
+                    .map(Department::getName)
+                    .orElse(null);
+        }
+
         return new AuthResponse(
                 "Login successful",
                 token,
-                UserDto.fromEntity(user),
+                com.civicconnect.dto.UserDto.fromEntity(user, deptName),
                 user.getEmail()
         );
     }
 
-    /**
-     * Retrieves profile for currently authenticated user.
-     */
     @Transactional(readOnly = true)
-    public UserDto getMe(User currentUser) {
-        return UserDto.fromEntity(currentUser);
-    }
-
-    /**
-     * Retrieves user profile by ID with RBAC check (self or Admin).
-     */
-    @Transactional(readOnly = true)
-    public UserDto getUserById(Long targetId, User currentUser) {
-        boolean isStaff = Constants.STAFF_ROLES.contains(currentUser.getRole().toUpperCase());
-        boolean isSelf = currentUser.getId().equals(targetId);
-
-        if (!isStaff && !isSelf) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Access forbidden: cannot view another user profile");
+    public UserResponse getMe(User currentUser) {
+        String deptName = null;
+        if (currentUser.getDepartmentId() != null) {
+            deptName = departmentRepository.findById(currentUser.getDepartmentId())
+                    .map(Department::getName)
+                    .orElse(null);
         }
-
-        User user = userRepository.findById(targetId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
-
-        return UserDto.fromEntity(user);
+        return UserResponse.fromEntity(currentUser, deptName);
     }
 
-    /**
-     * Lists all registered users for administrators.
-     */
-    @Transactional(readOnly = true)
-    public List<UserDto> getAllUsers(User currentUser) {
-        boolean isStaff = Constants.STAFF_ROLES.contains(currentUser.getRole().toUpperCase());
-        if (!isStaff) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Only staff can list users");
-        }
-        return userRepository.findAll().stream().map(UserDto::fromEntity).toList();
-    }
-
-    /**
-     * Updates an existing user record.
-     */
     @Transactional
-    public UserDto updateUser(Long id, Map<String, Object> body, User currentUser) {
-        boolean isStaff = Constants.STAFF_ROLES.contains(currentUser.getRole().toUpperCase());
-        boolean isSelf = currentUser.getId().equals(id);
-
-        if (!isStaff && !isSelf) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Access denied");
-        }
-
-        User user = userRepository.findById(id).orElse(currentUser);
+    public UserResponse updateProfile(User currentUser, Map<String, Object> body) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
 
         if (body.containsKey("name") && body.get("name") != null) {
             user.setName(body.get("name").toString().trim());
@@ -179,22 +149,27 @@ public class AuthService {
         if (body.containsKey("phone") && body.get("phone") != null) {
             user.setPhone(body.get("phone").toString().trim());
         }
-        if (isStaff && body.containsKey("role") && body.get("role") != null) {
-            user.setRole(body.get("role").toString().trim());
-        }
 
-        return UserDto.fromEntity(userRepository.save(user));
+        User saved = userRepository.save(user);
+        String deptName = null;
+        if (saved.getDepartmentId() != null) {
+            deptName = departmentRepository.findById(saved.getDepartmentId())
+                    .map(Department::getName)
+                    .orElse(null);
+        }
+        return UserResponse.fromEntity(saved, deptName);
     }
 
-    /**
-     * Deletes a user record.
-     */
     @Transactional
-    public void deleteUser(Long id, User currentUser) {
-        boolean isStaff = Constants.STAFF_ROLES.contains(currentUser.getRole().toUpperCase());
-        if (!isStaff) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Only Staff can delete users");
+    public void changePassword(User currentUser, ChangePasswordRequest request) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid current password");
         }
-        userRepository.findById(id).ifPresent(userRepository::delete);
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 }

@@ -21,7 +21,7 @@ import java.util.Map;
  * Controller handling complaint lifecycle endpoints: lodging, listing, draft forms, inspection, and status transitions.
  */
 @RestController
-@RequestMapping({"/api/complaints", "/complaints"})
+@RequestMapping("/api/complaints")
 public class ComplaintController {
 
     private final ComplaintService complaintService;
@@ -48,8 +48,12 @@ public class ComplaintController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ComplaintResponse>> getComplaints(@AuthenticationPrincipal User caller) {
-        return ResponseEntity.ok(complaintService.getComplaints(caller));
+    public ResponseEntity<List<ComplaintResponse>> getComplaints(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long departmentId,
+            @AuthenticationPrincipal User caller
+    ) {
+        return ResponseEntity.ok(complaintService.getComplaints(caller, status, departmentId));
     }
 
     @GetMapping("/my")
@@ -97,13 +101,21 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.updateStatus(idOrCode, request, staff));
     }
 
-    @PutMapping("/{idOrCode}/assign-worker")
-    public ResponseEntity<Map<String, Object>> assignWorker(
+    @PutMapping("/{idOrCode}/department")
+    public ResponseEntity<ComplaintResponse> reassignDepartment(
             @PathVariable String idOrCode,
             @RequestBody Map<String, Object> body,
-            @AuthenticationPrincipal User staff
+            @AuthenticationPrincipal User admin
     ) {
-        return ResponseEntity.ok(workflowService.assignWorker(idOrCode, body, staff));
+        Object deptIdVal = body.get("departmentId");
+        if (deptIdVal == null) {
+            deptIdVal = body.get("id");
+        }
+        if (deptIdVal == null) {
+            throw new IllegalArgumentException("Target departmentId is required");
+        }
+        Long newDepartmentId = Long.parseLong(deptIdVal.toString());
+        return ResponseEntity.ok(complaintService.reassignDepartment(idOrCode, newDepartmentId, admin));
     }
 
     @PutMapping("/{idOrCode}/reopen")

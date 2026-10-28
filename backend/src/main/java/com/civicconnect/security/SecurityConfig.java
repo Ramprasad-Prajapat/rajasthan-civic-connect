@@ -52,20 +52,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error", "/health", "/api/health").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/departments", "/departments").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/reports/summary", "/reports/summary").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/emergencies", "/emergencies").permitAll()
                         .requestMatchers(
                                 "/api/auth/register",
-                                "/api/auth/login",
-                                "/api/auth/sync-user",
-                                "/api/auth/forgot-password-verify",
-                                "/api/auth/reset-password",
-                                "/auth/register",
-                                "/auth/login",
-                                "/auth/sync-user",
-                                "/auth/forgot-password-verify",
-                                "/auth/reset-password"
+                                "/api/auth/login"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

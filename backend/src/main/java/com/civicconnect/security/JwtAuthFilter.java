@@ -21,7 +21,7 @@ import java.util.Optional;
 
 /**
  * Filter intercepting incoming HTTP requests to validate JWT and populate SecurityContext.
- * The user's role is strictly loaded from the MySQL database.
+ * Verifies active status and loads authoritative role from MySQL.
  */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -55,8 +55,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                String role = user.getRole();
 
+                // Reject deactivated users immediately with 403 Forbidden
+                if (user.getActive() != null && !user.getActive()) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"error\":\"Account is disabled\",\"message\":\"Account is disabled\"}");
+                    return;
+                }
+
+                String role = user.getRole();
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                 if (role != null) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase().replace(' ', '_')));

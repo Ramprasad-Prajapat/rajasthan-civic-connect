@@ -2,12 +2,13 @@ package com.civicconnect.config;
 
 import com.civicconnect.entity.Complaint;
 import com.civicconnect.entity.ComplaintTimeline;
+import com.civicconnect.entity.Department;
 import com.civicconnect.entity.User;
 import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.ComplaintTimelineRepository;
+import com.civicconnect.repository.DepartmentRepository;
 import com.civicconnect.repository.UserRepository;
 import com.civicconnect.util.Constants;
-import com.civicconnect.util.DepartmentMapper;
 import com.civicconnect.util.SlaCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +22,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 /**
- * Seeds demo accounts and initial complaints at startup if app.seed-demo-users=true.
- * Idempotent: checks for existence before adding rows.
+ * Seeds standard departments, demo accounts, and sample complaints at startup if app.seed-demo-users=true.
+ * Fully idempotent.
  */
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -30,6 +31,7 @@ public class DataSeeder implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
     private final ComplaintRepository complaintRepository;
     private final ComplaintTimelineRepository timelineRepository;
     private final PasswordEncoder passwordEncoder;
@@ -39,11 +41,13 @@ public class DataSeeder implements CommandLineRunner {
 
     public DataSeeder(
             UserRepository userRepository,
+            DepartmentRepository departmentRepository,
             ComplaintRepository complaintRepository,
             ComplaintTimelineRepository timelineRepository,
             PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
+        this.departmentRepository = departmentRepository;
         this.complaintRepository = complaintRepository;
         this.timelineRepository = timelineRepository;
         this.passwordEncoder = passwordEncoder;
@@ -56,16 +60,55 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        User citizen = seedUserIfMissing("citizen@civic.local", "Demo Citizen", "Citizen@123", Constants.ROLE_CITIZEN, "citizen");
-        seedUserIfMissing("officer@civic.local", "Municipal Officer", "Officer@123", Constants.ROLE_OFFICER, "department");
-        seedUserIfMissing("admin@civic.local", "System Administrator", "Admin@123", Constants.ROLE_ADMIN, "admin");
+        // 1. Seed standard departments
+        Department waterDept = seedDepartmentIfMissing("Water Department", "WATER", "Water Supply and Pipeline Maintenance", "water@civic.local");
+        Department sanitationDept = seedDepartmentIfMissing("Sanitation Department", "SANITATION", "Waste Management and Sanitation Services", "sanitation@civic.local");
+        Department pwdDept = seedDepartmentIfMissing("Public Works Department", "PWD", "Road and Infrastructure Maintenance", "pwd@civic.local");
+        Department elecDept = seedDepartmentIfMissing("Electricity Department", "ELEC", "Power Grid and Street Lighting", "elec@civic.local");
+        Department generalDept = seedDepartmentIfMissing("General Municipal Department", "GEN", "General municipal grievances and administrative support", "general@civic.local");
 
+        // 2. Seed demo users
+        User citizen = seedUserIfMissing("citizen@civic.local", "Demo Citizen", "Citizen@123", Constants.ROLE_CITIZEN, "citizen", null);
+        seedUserIfMissing("officer@civic.local", "Officer Water", "Officer@123", Constants.ROLE_OFFICER, "department", waterDept.getId());
+        seedUserIfMissing("officer2@civic.local", "Officer Sanitation", "Officer@123", Constants.ROLE_OFFICER, "department", sanitationDept.getId());
+        seedUserIfMissing("admin@civic.local", "System Administrator", "Admin@123", Constants.ROLE_ADMIN, "admin", null);
+
+        // 3. Seed sample complaints if table is empty
         if (complaintRepository.count() == 0 && citizen != null) {
-            seedSampleComplaints(citizen);
+            seedSampleComplaints(citizen, elecDept, sanitationDept, waterDept);
         }
     }
 
-    private User seedUserIfMissing(String email, String name, String rawPassword, String role, String portal) {
+    private Department seedDepartmentIfMissing(String name, String code, String description, String contact) {
+        return departmentRepository.findByNameIgnoreCase(name).map(existing -> {
+            boolean updated = false;
+            if (code != null && !code.equalsIgnoreCase(existing.getCode())) {
+                existing.setCode(code);
+                updated = true;
+            }
+            if (description != null && !description.equals(existing.getDescription())) {
+                existing.setDescription(description);
+                updated = true;
+            }
+            if (contact != null && !contact.equals(existing.getContact())) {
+                existing.setContact(contact);
+                updated = true;
+            }
+            if (!existing.isActive()) {
+                existing.setActive(true);
+                updated = true;
+            }
+            return updated ? departmentRepository.save(existing) : existing;
+        }).orElseGet(() -> {
+            Department dept = new Department(name, code, description, contact);
+            dept.setActive(true);
+            Department saved = departmentRepository.save(dept);
+            log.info("Department seeded: {} [{}]", name, code);
+            return saved;
+        });
+    }
+
+    private User seedUserIfMissing(String email, String name, String rawPassword, String role, String portal, Long departmentId) {
         return userRepository.findByEmail(email).map(existing -> {
             boolean updated = false;
             if (!passwordEncoder.matches(rawPassword, existing.getPasswordHash())) {
@@ -78,6 +121,14 @@ public class DataSeeder implements CommandLineRunner {
             }
             if (portal != null && !portal.equalsIgnoreCase(existing.getPortal())) {
                 existing.setPortal(portal);
+                updated = true;
+            }
+            if (departmentId != null && !departmentId.equals(existing.getDepartmentId())) {
+                existing.setDepartmentId(departmentId);
+                updated = true;
+            }
+            if (!existing.isActive()) {
+                existing.setActive(true);
                 updated = true;
             }
             if (updated) {
@@ -95,16 +146,18 @@ public class DataSeeder implements CommandLineRunner {
                     role,
                     portal
             );
+            user.setDepartmentId(departmentId);
+            user.setActive(true);
             User saved = userRepository.save(user);
             log.info("Demo user seeded: {} [{}]", email, role);
             return saved;
         });
     }
 
-    private void seedSampleComplaints(User citizen) {
+    private void seedSampleComplaints(User citizen, Department elecDept, Department sanitationDept, Department waterDept) {
         Instant now = Instant.now();
 
-        // 1. Complaint: Submitted (Street Light)
+        // 1. Complaint: Submitted (Street Light -> Electricity Dept)
         Complaint c1 = createComplaintEntity(
                 "RJCIVIC-JAI-NNG-2026-1001",
                 "Broken Street Light Near MI Road",
@@ -116,6 +169,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.PRIORITY_NORMAL,
                 Constants.STATUS_SUBMITTED,
                 citizen,
+                elecDept,
                 now.minus(2, ChronoUnit.HOURS)
         );
         Complaint saved1 = complaintRepository.save(c1);
@@ -128,7 +182,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.ROLE_CITIZEN
         ));
 
-        // 2. Complaint: In Progress (Garbage)
+        // 2. Complaint: In Progress (Garbage -> Sanitation Dept)
         Complaint c2 = createComplaintEntity(
                 "RJCIVIC-JOD-NNG-2026-1002",
                 "Overflowing Garbage Bin at Ratanada",
@@ -140,6 +194,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.PRIORITY_HIGH,
                 Constants.STATUS_IN_PROGRESS,
                 citizen,
+                sanitationDept,
                 now.minus(6, ChronoUnit.HOURS)
         );
         Complaint saved2 = complaintRepository.save(c2);
@@ -156,11 +211,11 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.STATUS_IN_PROGRESS,
                 "Status: InProgress",
                 "Sanitation team dispatched with garbage collection vehicle.",
-                "Municipal Officer",
+                "Officer Sanitation",
                 Constants.ROLE_OFFICER
         ));
 
-        // 3. Complaint: Resolved (Water)
+        // 3. Complaint: Resolved (Water -> Water Dept)
         Complaint c3 = createComplaintEntity(
                 "RJCIVIC-UDA-NP-2026-1003",
                 "Water Pipeline Leakage at City Palace Road",
@@ -172,6 +227,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.PRIORITY_CRITICAL,
                 Constants.STATUS_RESOLVED,
                 citizen,
+                waterDept,
                 now.minus(12, ChronoUnit.HOURS)
         );
         c3.setResolvedAt(now.minus(1, ChronoUnit.HOURS));
@@ -189,7 +245,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.STATUS_IN_PROGRESS,
                 "Status: InProgress",
                 "Emergency pipeline repair technician assigned.",
-                "Municipal Officer",
+                "Officer Water",
                 Constants.ROLE_OFFICER
         ));
         timelineRepository.save(new ComplaintTimeline(
@@ -197,7 +253,7 @@ public class DataSeeder implements CommandLineRunner {
                 Constants.STATUS_RESOLVED,
                 "Status: Resolved",
                 "Pipe joint repaired and water pressure tested normal.",
-                "Municipal Officer",
+                "Officer Water",
                 Constants.ROLE_OFFICER
         ));
 
@@ -215,9 +271,9 @@ public class DataSeeder implements CommandLineRunner {
             String priority,
             String status,
             User citizen,
+            Department dept,
             Instant createdAt
     ) {
-        String dept = DepartmentMapper.mapCategoryToDepartment(category);
         SlaCalculator.SlaResult sla = SlaCalculator.calculateSla(priority, false);
 
         Complaint c = new Complaint();
@@ -228,8 +284,8 @@ public class DataSeeder implements CommandLineRunner {
         c.setDistrict(district);
         c.setUlbName(ulbName);
         c.setWardNumber(ward);
-        c.setDepartmentId(dept.replaceAll("\\s+", "_"));
-        c.setDepartmentName(dept);
+        c.setDepartmentId(dept.getId());
+        c.setDepartmentName(dept.getName());
         c.setPriority(priority);
         c.setStatus(status);
         c.setSlaHours(sla.slaHours());

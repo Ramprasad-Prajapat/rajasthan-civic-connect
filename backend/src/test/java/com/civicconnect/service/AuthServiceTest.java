@@ -27,6 +27,9 @@ class AuthServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private com.civicconnect.repository.DepartmentRepository departmentRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -36,7 +39,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtService);
+        authService = new AuthService(userRepository, departmentRepository, passwordEncoder, jwtService);
     }
 
     @Test

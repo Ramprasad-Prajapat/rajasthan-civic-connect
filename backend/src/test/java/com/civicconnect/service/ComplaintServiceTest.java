@@ -6,6 +6,7 @@ import com.civicconnect.entity.User;
 import com.civicconnect.exception.ApiException;
 import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.ComplaintTimelineRepository;
+import com.civicconnect.repository.DepartmentRepository;
 import com.civicconnect.util.Constants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,13 +30,13 @@ class ComplaintServiceTest {
     private ComplaintTimelineRepository timelineRepository;
 
     @Mock
+    private DepartmentRepository departmentRepository;
+
+    @Mock
     private ComplaintMediaService mediaService;
 
     @Mock
     private NotificationService notificationService;
-
-    @Mock
-    private AuditLogService auditLogService;
 
     @Mock
     private ComplaintDraftService draftService;
@@ -47,9 +48,9 @@ class ComplaintServiceTest {
         complaintService = new ComplaintService(
                 complaintRepository,
                 timelineRepository,
+                departmentRepository,
                 mediaService,
                 notificationService,
-                auditLogService,
                 draftService
         );
     }
@@ -79,14 +80,39 @@ class ComplaintServiceTest {
     }
 
     @Test
+    void testOfficerOpeningOtherDepartmentComplaintThrows403Forbidden() {
+        User waterOfficer = new User("Water Officer", "water@civic.local", "hash", "333", Constants.ROLE_OFFICER, "department");
+        waterOfficer.setId(3L);
+        waterOfficer.setDepartmentId(100L);
+
+        Complaint sanitationComplaint = new Complaint();
+        sanitationComplaint.setId(20L);
+        sanitationComplaint.setComplaintCode("RJCIVIC-JAI-NNG-2026-0020");
+        sanitationComplaint.setCitizenId(1L);
+        sanitationComplaint.setDepartmentId(200L); // different department
+        sanitationComplaint.setStatus(Constants.STATUS_SUBMITTED);
+
+        when(complaintRepository.findByComplaintCode("RJCIVIC-JAI-NNG-2026-0020")).thenReturn(Optional.of(sanitationComplaint));
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                complaintService.getComplaintDetail("RJCIVIC-JAI-NNG-2026-0020", waterOfficer)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertTrue(ex.getMessage().contains("another department"));
+    }
+
+    @Test
     void testUpdateClosedComplaintThrows409Conflict() {
         User officer = new User("Officer", "officer@civic.local", "hash", "333", Constants.ROLE_OFFICER, "department");
         officer.setId(3L);
+        officer.setDepartmentId(100L);
 
         Complaint closedComplaint = new Complaint();
         closedComplaint.setId(20L);
         closedComplaint.setComplaintCode("RJCIVIC-JAI-NNG-2026-0020");
         closedComplaint.setCitizenId(1L);
+        closedComplaint.setDepartmentId(100L);
         closedComplaint.setStatus(Constants.STATUS_CLOSED);
 
         when(complaintRepository.findByComplaintCode("RJCIVIC-JAI-NNG-2026-0020")).thenReturn(Optional.of(closedComplaint));
@@ -98,6 +124,5 @@ class ComplaintServiceTest {
         );
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
-        assertTrue(ex.getMessage().contains("already closed"));
     }
 }

@@ -9,7 +9,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "complaints", indexes = {
         @Index(name = "idx_complaint_code", columnList = "complaint_code", unique = true),
-        @Index(name = "idx_citizen_id", columnList = "citizen_id")
+        @Index(name = "idx_citizen_id", columnList = "citizen_id"),
+        @Index(name = "idx_department_id", columnList = "department_id")
 })
 public class Complaint {
 
@@ -60,9 +61,9 @@ public class Complaint {
     private String priority;
 
     @Column(name = "department_id")
-    private String departmentId;
+    private Long departmentId;
 
-    @Column(name = "department_name", nullable = false)
+    @Column(name = "department_name")
     private String departmentName;
 
     @Column(name = "sla_hours")
@@ -85,9 +86,6 @@ public class Complaint {
 
     @Column(name = "citizen_phone")
     private String citizenPhone;
-
-    @Column(name = "is_emergency")
-    private Boolean isEmergency = false;
 
     @Column(columnDefinition = "TEXT")
     private String remarks;
@@ -122,7 +120,6 @@ public class Complaint {
         this.updatedAt = Instant.now();
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -174,8 +171,8 @@ public class Complaint {
     public String getPriority() { return priority; }
     public void setPriority(String priority) { this.priority = priority; }
 
-    public String getDepartmentId() { return departmentId; }
-    public void setDepartmentId(String departmentId) { this.departmentId = departmentId; }
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
 
     public String getDepartmentName() { return departmentName; }
     public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
@@ -200,9 +197,6 @@ public class Complaint {
 
     public String getCitizenPhone() { return citizenPhone; }
     public void setCitizenPhone(String citizenPhone) { this.citizenPhone = citizenPhone; }
-
-    public Boolean getIsEmergency() { return isEmergency; }
-    public void setIsEmergency(Boolean emergency) { isEmergency = emergency; }
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }

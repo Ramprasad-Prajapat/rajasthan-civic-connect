@@ -1,114 +1,144 @@
 package com.civicconnect.service;
 
+import com.civicconnect.dto.CreateDepartmentRequest;
+import com.civicconnect.dto.DepartmentResponse;
+import com.civicconnect.dto.UpdateDepartmentRequest;
 import com.civicconnect.entity.Department;
+import com.civicconnect.exception.ApiException;
+import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.DepartmentRepository;
-import jakarta.annotation.PostConstruct;
+import com.civicconnect.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Service managing municipal department records with automatic seed initialization.
+ * Service managing municipal department records, activations, and integrity checks.
  */
 @Service
 public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
+    private final ComplaintRepository complaintRepository;
+    private final UserRepository userRepository;
 
-    public DepartmentService(DepartmentRepository departmentRepository) {
+    public DepartmentService(
+            DepartmentRepository departmentRepository,
+            ComplaintRepository complaintRepository,
+            UserRepository userRepository
+    ) {
         this.departmentRepository = departmentRepository;
-    }
-
-    @PostConstruct
-    @Transactional
-    public void seedInitialDepartments() {
-        if (departmentRepository.count() == 0) {
-            List<Department> defaults = List.of(
-                    new Department("sanitation", "Sanitation Department", "Amit Kumar"),
-                    new Department("electrical", "Electrical Department", "Rajesh Sharma"),
-                    new Department("water", "Water Department", "Sunil Verma"),
-                    new Department("sewerage", "Sewerage Department", "Dinesh Gupta"),
-                    new Department("pworks", "Public Works Department", "Vikram Singh")
-            );
-            defaults.forEach(d -> {
-                d.setHead(d.getOfficer());
-                d.setContact("0141-2740000");
-                departmentRepository.save(d);
-            });
-        }
+        this.complaintRepository = complaintRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
-    public List<Department> getAllDepartments() {
-        return departmentRepository.findAll();
+    public List<DepartmentResponse> getActiveDepartments() {
+        return departmentRepository.findByActiveTrue().stream()
+                .map(DepartmentResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DepartmentResponse> getAllDepartments() {
+        return departmentRepository.findAllByOrderByNameAsc().stream()
+                .map(d -> DepartmentResponse.fromEntity(
+                        d,
+                        userRepository.countByDepartmentId(d.getId()),
+                        complaintRepository.countByDepartmentId(d.getId())
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Department findById(Long id) {
+        return departmentRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Department not found"));
     }
 
     @Transactional
-    public Department createDepartment(Map<String, Object> payload) {
-        String name = payload.get("name") != null && !payload.get("name").toString().isBlank() ?
-                payload.get("name").toString().trim() : "Department " + System.currentTimeMillis();
-
-        if (departmentRepository.existsByName(name)) {
-            name = name + " " + System.currentTimeMillis();
+    public DepartmentResponse createDepartment(CreateDepartmentRequest req) {
+        String name = req.name() != null ? req.name().trim() : "";
+        if (name.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Department name cannot be blank");
+        }
+        if (departmentRepository.existsByNameIgnoreCase(name)) {
+            throw new ApiException(HttpStatus.CONFLICT, "Department with this name already exists");
         }
 
-        String deptId = payload.get("deptId") != null ? payload.get("deptId").toString().trim() :
-                (payload.get("id") != null ? payload.get("id").toString().trim() :
-                name.toLowerCase().replaceAll("[^a-z0-9]+", "_"));
+        String code = req.code() != null && !req.code().isBlank()
+                ? req.code().trim().toUpperCase()
+                : name.replaceAll("[^A-Za-z0-9]+", "_").toUpperCase();
 
-        Department dept = new Department(deptId, name, payload.get("officer") != null ? payload.get("officer").toString() : "");
-        dept.setHead(payload.get("head") != null ? payload.get("head").toString() : dept.getOfficer());
-        dept.setContact(payload.get("contact") != null ? payload.get("contact").toString() : "");
-        return departmentRepository.save(dept);
+        Department dept = new Department(name, code, req.description(), req.contact());
+        dept.setActive(true);
+        Department saved = departmentRepository.save(dept);
+        return DepartmentResponse.fromEntity(saved, 0L, 0L);
     }
 
     @Transactional
-    public Department updateDepartment(String idOrDeptId, Map<String, Object> payload) {
-        Department dept = departmentRepository.findByDeptId(idOrDeptId)
-                .or(() -> {
-                    try {
-                        return departmentRepository.findById(Long.parseLong(idOrDeptId));
-                    } catch (NumberFormatException e) {
-                        return java.util.Optional.empty();
-                    }
-                })
-                .orElseGet(() -> {
-                    Department d = new Department(idOrDeptId, "Department " + idOrDeptId, "Officer");
-                    return departmentRepository.save(d);
-                });
+    public DepartmentResponse updateDepartment(Long id, UpdateDepartmentRequest req) {
+        Department dept = findById(id);
 
-        if (payload.containsKey("name") && payload.get("name") != null) {
-            dept.setName(payload.get("name").toString().trim());
+        if (req.name() != null && !req.name().isBlank()) {
+            String newName = req.name().trim();
+            if (!newName.equalsIgnoreCase(dept.getName()) && departmentRepository.existsByNameIgnoreCase(newName)) {
+                throw new ApiException(HttpStatus.CONFLICT, "Another department already has this name");
+            }
+            dept.setName(newName);
         }
-        if (payload.containsKey("officer") && payload.get("officer") != null) {
-            dept.setOfficer(payload.get("officer").toString().trim());
+        if (req.code() != null) {
+            dept.setCode(req.code().trim());
         }
-        if (payload.containsKey("head") && payload.get("head") != null) {
-            dept.setHead(payload.get("head").toString().trim());
+        if (req.description() != null) {
+            dept.setDescription(req.description().trim());
         }
-        if (payload.containsKey("contact") && payload.get("contact") != null) {
-            dept.setContact(payload.get("contact").toString().trim());
+        if (req.contact() != null) {
+            dept.setContact(req.contact().trim());
         }
-        if (payload.containsKey("status") && payload.get("status") != null) {
-            dept.setStatus(payload.get("status").toString().trim());
+        if (req.active() != null) {
+            dept.setActive(req.active());
         }
         dept.setUpdatedAt(Instant.now());
-        return departmentRepository.save(dept);
+
+        Department saved = departmentRepository.save(dept);
+        return DepartmentResponse.fromEntity(
+                saved,
+                userRepository.countByDepartmentId(saved.getId()),
+                complaintRepository.countByDepartmentId(saved.getId())
+        );
     }
 
     @Transactional
-    public void deleteDepartment(String idOrDeptId) {
-        departmentRepository.findByDeptId(idOrDeptId)
-                .or(() -> {
-                    try {
-                        return departmentRepository.findById(Long.parseLong(idOrDeptId));
-                    } catch (NumberFormatException e) {
-                        return java.util.Optional.empty();
-                    }
-                })
-                .ifPresent(departmentRepository::delete);
+    public DepartmentResponse setDepartmentActive(Long id, boolean active) {
+        Department dept = findById(id);
+        dept.setActive(active);
+        dept.setUpdatedAt(Instant.now());
+        Department saved = departmentRepository.save(dept);
+        return DepartmentResponse.fromEntity(
+                saved,
+                userRepository.countByDepartmentId(saved.getId()),
+                complaintRepository.countByDepartmentId(saved.getId())
+        );
+    }
+
+    @Transactional
+    public void deleteDepartment(Long id) {
+        Department dept = findById(id);
+
+        long complaintCount = complaintRepository.countByDepartmentId(dept.getId());
+        long officerCount = userRepository.countByDepartmentId(dept.getId());
+
+        if (complaintCount > 0 || officerCount > 0) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Cannot delete department with " + complaintCount + " complaints and " + officerCount + " officers. Please deactivate instead."
+            );
+        }
+
+        departmentRepository.delete(dept);
     }
 }

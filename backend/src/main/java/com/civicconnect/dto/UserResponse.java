@@ -2,9 +2,10 @@ package com.civicconnect.dto;
 
 import com.civicconnect.entity.User;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
 
 /**
- * Public user profile data transfer record. Exposes id and uid as strings.
+ * Public user profile data transfer record.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UserResponse(
@@ -16,10 +17,19 @@ public record UserResponse(
         String phone,
         String role,
         String portal,
-        String status
+        String status,
+        Long departmentId,
+        String departmentName,
+        Boolean active,
+        Instant createdAt
 ) {
     public static UserResponse fromEntity(User user) {
+        return fromEntity(user, null);
+    }
+
+    public static UserResponse fromEntity(User user, String departmentName) {
         String idStr = user.getId() != null ? String.valueOf(user.getId()) : null;
+        boolean isActive = user.getActive() != null ? user.getActive() : true;
         return new UserResponse(
                 idStr,
                 idStr,
@@ -29,7 +39,11 @@ public record UserResponse(
                 user.getPhone(),
                 user.getRole(),
                 user.getPortal(),
-                "Active"
+                isActive ? "Active" : "Inactive",
+                user.getDepartmentId(),
+                departmentName,
+                isActive,
+                user.getCreatedAt()
         );
     }
 }

@@ -8,7 +8,6 @@ import java.util.List;
 
 /**
  * Public response record for a complaint ticket.
- * Exposes id and complaintId as strings and attaches photo proofs and audit timelines.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ComplaintResponse(
@@ -38,7 +37,6 @@ public record ComplaintResponse(
         String citizenName,
         String citizenEmail,
         String citizenPhone,
-        Boolean isEmergency,
         String remarks,
         String photo,
         List<String> beforePhotos,
@@ -60,7 +58,10 @@ public record ComplaintResponse(
             List<String> beforePhotos,
             List<String> afterPhotos
     ) {
-        String idStr = entity.getId() != null ? String.valueOf(entity.getId()) : entity.getComplaintCode();
+        String idStr = entity.getId() != null ? String.valueOf(entity.getId()) : null;
+        String deptIdStr = entity.getDepartmentId() != null ? String.valueOf(entity.getDepartmentId()) : null;
+        String citizenIdStr = entity.getCitizenId() != null ? String.valueOf(entity.getCitizenId()) : null;
+
         return new ComplaintResponse(
                 idStr,
                 entity.getComplaintCode(),
@@ -79,20 +80,19 @@ public record ComplaintResponse(
                 entity.getAccuracy(),
                 entity.getLocationSource(),
                 entity.getPriority(),
-                entity.getDepartmentId(),
+                deptIdStr,
                 entity.getDepartmentName(),
                 entity.getSlaHours(),
                 entity.getSlaDeadline() != null ? entity.getSlaDeadline().toString() : null,
                 entity.getStatus(),
-                entity.getCitizenId() != null ? String.valueOf(entity.getCitizenId()) : null,
+                citizenIdStr,
                 entity.getCitizenName(),
                 entity.getCitizenEmail(),
                 entity.getCitizenPhone(),
-                entity.getIsEmergency(),
                 entity.getRemarks(),
-                photo != null ? photo : "",
-                beforePhotos != null ? beforePhotos : Collections.emptyList(),
-                afterPhotos != null ? afterPhotos : Collections.emptyList(),
+                photo != null && !photo.isBlank() ? photo : null,
+                beforePhotos != null && !beforePhotos.isEmpty() ? beforePhotos : null,
+                afterPhotos != null && !afterPhotos.isEmpty() ? afterPhotos : null,
                 timeline != null ? timeline : Collections.emptyList(),
                 entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
                 entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null,
