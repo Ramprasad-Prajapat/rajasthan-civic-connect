@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { isFirebaseConfigured, db, firestore } from '../firebase';
-import { ref, set, onValue } from 'firebase/database';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { createComplaint, getComplaint, submitFeedback, reopenComplaint, saveComplaintDraft, getComplaintDraft, deleteComplaintDraft } from '../firestoreService';
+import { createComplaint, getComplaint, submitFeedback, reopenComplaint, saveComplaintDraft, getComplaintDraft, deleteComplaintDraft } from '../apiService';
 import MapPicker from './MapPicker';
 export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, authenticatedUser = null }) {
   // Page sections: 'submit' (form), 'track' (tracking), 'reopen' (reopen form), 'emergency' (alert)
@@ -185,10 +182,11 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
         updatedAt: new Date().toISOString()
       };
       
-      localStorage.setItem('rajcivic_complaint_draft', JSON.stringify(draftData));
-      
       if (authenticatedUser) {
+        localStorage.removeItem('rajcivic_complaint_draft');
         saveComplaintDraft(draftData).catch(err => console.error("Failed to sync draft to backend:", err));
+      } else {
+        localStorage.setItem('rajcivic_complaint_draft', JSON.stringify(draftData));
       }
     }, 1000);
     
@@ -701,7 +699,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
     try {
       const result = await getComplaint(trackID);
       if (result) {
-        // Map Firestore fields to local UI mapping
+        // Map database fields to local UI mapping
         const mappedResult = {
           ...result,
           id: result.id || result.complaintId,

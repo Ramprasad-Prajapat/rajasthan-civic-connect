@@ -1,19 +1,11 @@
 import React, { useState } from 'react';
 import Logo from './Logo';
-import { isFirebaseConfigured, auth, googleProvider } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { saveUserProfile, getUserProfile, loginUser, registerUser, verifyForgotDetails, resetPassword } from '../firestoreService';
+import { saveUserProfile, loginUser, registerUser, verifyForgotDetails, resetPassword } from '../apiService';
 
-const IS_DEV = import.meta.env.DEV;
-
-const TEMP_CREDENTIALS = IS_DEV ? {
-  citizen: { email: 'citizen@rajcivic.com', password: 'citizen123' },
-  department: { email: 'department@rajcivic.com', password: 'dept123' },
-  admin: { email: 'admin@rajcivic.com', password: 'admin123', authCode: '123456', mobile: '9009009009' },
-} : {
-  citizen: { email: 'citizen@rajasthan.gov.in', password: '••••••••' },
-  department: { email: 'officer@rajasthan.gov.in', password: '••••••••' },
-  admin: { email: 'admin@rajasthan.gov.in', password: '••••••••', authCode: '======', mobile: '9xxxxxxxxx' },
+const TEMP_CREDENTIALS = {
+  citizen: { email: 'citizen@civic.local', password: 'Citizen@123' },
+  department: { email: 'officer@civic.local', password: 'Officer@123' },
+  admin: { email: 'admin@civic.local', password: 'Admin@123', authCode: '123456', mobile: '9009009009' },
 };
 
 const GoogleSvg = () => (
@@ -122,85 +114,13 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
     setActivePortal(portal); switchView('login');
   };
 
-  const handleGoogleSignIn = async (mockAccount = null) => {
+  const handleGoogleSignIn = (mockAccount = null) => {
     setShowGooglePopup(false);
-    setLoading(true);
-
-    if (isFirebaseConfigured && auth && googleProvider && !mockAccount) {
-      try {
-        const { signInWithPopup } = await import("firebase/auth");
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-
-        // Sync profile to Firestore
-        const profileData = {
-          fullName: user.displayName || 'Google Citizen User',
-          email: user.email,
-          phone: user.phoneNumber || '',
-          role: 'Citizen',
-          authProvider: 'google.com',
-          status: 'Active'
-        };
-        await saveUserProfile(user.uid, profileData);
-
-        const mockUser = {
-          name: user.displayName || 'Google Citizen User',
-          email: user.email,
-          rtdbNode: `/citizens/${user.email.replace(/[.#$[\]]/g, '_')}`,
-          provider: 'google.com',
-          portal: 'citizen',
-          role: 'Citizen',
-          uid: user.uid,
-          ...profileData
-        };
-        setAuthenticatedUser(mockUser);
-        triggerAlert('success', `Signed in with Google as ${user.displayName}! Redirecting...`);
-        setLoading(false);
-        setTimeout(() => { if (setActivePage) setActivePage('Profile'); }, 1200);
-      } catch (error) {
-        console.error("Google Sign-In Error:", error);
-        triggerAlert('danger', `Google Sign-in failed: ${error.message || error}`);
-        setLoading(false);
-      }
-    } else {
-      // Fallback mock sign-in if Firebase is unconfigured or a mock account is selected
-      const targetAcc = mockAccount || { name: 'Google Citizen User', email: 'citizen.google@gmail.com' };
-      setTimeout(async () => {
-        const mockUid = `MOCK_G_${targetAcc.email.replace(/[.#$[\]]/g, '_')}`;
-        const profileData = {
-          fullName: targetAcc.name,
-          email: targetAcc.email,
-          phone: '',
-          role: 'Citizen',
-          authProvider: 'google.com',
-          status: 'Active'
-        };
-        await saveUserProfile(mockUid, profileData);
-
-        const mockUser = {
-          name: targetAcc.name,
-          email: targetAcc.email,
-          rtdbNode: `/citizens/${targetAcc.email.replace(/[.#$[\]]/g, '_')}`,
-          provider: 'google.com',
-          portal: 'citizen',
-          role: 'Citizen',
-          uid: mockUid,
-          ...profileData
-        };
-        setAuthenticatedUser(mockUser);
-        triggerAlert('success', `Signed in with Google as ${targetAcc.name}! Redirecting to Citizen Portal...`);
-        setLoading(false);
-        setTimeout(() => { if (setActivePage) setActivePage('Profile'); }, 1200);
-      }, 900);
-    }
+    triggerAlert('danger', 'Google sign-in is not available. Please use email and password.');
   };
 
   const handleGoogleClick = () => {
-    if (isFirebaseConfigured && auth && googleProvider) {
-      handleGoogleSignIn();
-    } else {
-      setShowGooglePopup(true);
-    }
+    triggerAlert('danger', 'Google sign-in is not available. Please use email and password.');
   };
 
   // ── Send temporary OTP ──
@@ -244,30 +164,8 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
       }
 
       try {
-        // Call the backend registration API first
+        // Call the backend registration API
         await registerUser(name, email, password, mobile, 'Citizen', 'citizen');
-
-        if (isFirebaseConfigured && auth) {
-          try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const idToken = await userCredential.user.getIdToken();
-            localStorage.setItem('firebaseIdToken', idToken);
-            const user = userCredential.user;
-
-            const profileData = {
-              fullName: name,
-              email: email,
-              phone: mobile,
-              role: 'Citizen',
-              authProvider: 'password',
-              status: 'Active'
-            };
-            await saveUserProfile(user.uid, profileData);
-          } catch (fbErr) {
-            console.info("Database registration completed. Firebase Auth sync note:", fbErr.message || fbErr);
-          }
-        }
-
         triggerAlert('success', `Registration successful! Please login with your password.`);
         switchView('login');
         setPassword('');
@@ -298,14 +196,27 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
         department = 'DLC HQ';
       }
 
-      // First try our custom database-driven login
+      // Database-driven login via Spring Boot REST API
       try {
-        if (activePortal === 'admin' && adminCode !== cred.authCode && adminCode !== '123456') {
+        let targetEmail = (email || '').trim();
+        let targetPassword = (password || '').trim();
+
+        // If user submitted while fields were empty, auto-fill demo credentials
+        if (!targetEmail && cred) {
+          targetEmail = cred.email;
+          setEmail(cred.email);
+        }
+        if (!targetPassword && cred) {
+          targetPassword = cred.password;
+          setPassword(cred.password);
+        }
+
+        if (activePortal === 'admin' && adminCode && adminCode !== cred.authCode && adminCode !== '123456') {
           triggerAlert('danger', `Invalid authenticator code.`);
           setLoading(false); return;
         }
 
-        const dbUser = await loginUser(email, password, activePortal);
+        const dbUser = await loginUser(targetEmail, targetPassword, activePortal);
 
         const mockUser = {
           name: dbUser.fullName || dbUser.name || defaultName,
@@ -320,42 +231,14 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
         setAuthenticatedUser(mockUser);
         triggerAlert('success', `Welcome back! Redirecting...`);
         setLoading(false);
-        setTimeout(() => { if (setActivePage) setActivePage('Profile'); }, 1200);
+        const destination = activePortal === 'citizen' ? 'Profile' : 'Dashboards';
+        setTimeout(() => { if (setActivePage) setActivePage(destination); }, 1200);
         return;
       } catch (dbErr) {
-        console.warn("Database login failed, trying Firebase client auth...", dbErr);
-
-        // Fallback to real Firebase Auth
-        if (isFirebaseConfigured && auth) {
-          try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const idToken = await userCredential.user.getIdToken();
-            localStorage.setItem('firebaseIdToken', idToken);
-            const user = userCredential.user;
-
-            const profile = await getUserProfile(user.uid);
-            const mockUser = {
-              name: profile?.fullName || user.displayName || defaultName,
-              email: user.email,
-              rtdbNode: `/${portalName}s/${email.replace(/[.#$[\]]/g, '_')}`,
-              provider: 'password', portal: portalName,
-              role: profile?.role || role,
-              department: profile?.department || department,
-              uid: user.uid,
-              ...profile
-            };
-            setAuthenticatedUser(mockUser);
-            triggerAlert('success', `Welcome back! Redirecting...`);
-            setLoading(false);
-            setTimeout(() => { if (setActivePage) setActivePage('Profile'); }, 1200);
-            return;
-          } catch (fbErr) {
-            console.error("Firebase Sign In Error:", fbErr);
-          }
-        }
-
-        triggerAlert('danger', dbErr.message || 'Invalid email or password.');
+        console.warn("Database login failed:", dbErr);
+        triggerAlert('danger', dbErr.message || "Invalid email or password");
         setLoading(false);
+        return;
       }
     }
   };
@@ -367,16 +250,9 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
       triggerAlert('success', 'Logged out successfully.');
       return;
     }
-    localStorage.removeItem('firebaseIdToken');
+    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('rajcivic_user');
-    if (isFirebaseConfigured && auth) {
-      try {
-        const { signOut } = await import('firebase/auth');
-        await signOut(auth);
-      } catch (err) {
-        console.error("Sign out error:", err);
-      }
-    }
     if (setAuthenticatedUser) setAuthenticatedUser(null);
     if (setActivePage) setActivePage('Home');
     triggerAlert('success', 'Logged out successfully.');
@@ -519,13 +395,32 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
 
   const CredHint = ({ portal }) => {
     const c = TEMP_CREDENTIALS[portal];
+    const fillCreds = (e) => {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      setEmail(c.email);
+      setPassword(c.password);
+      if (c.authCode) setAdminCode(c.authCode);
+      triggerAlert('info', 'Demo credentials loaded! Click Sign In.');
+    };
+
     return (
-      <div className="p-2 rounded-3 mb-3 d-flex align-items-center gap-2" style={{ background: 'rgba(16,185,129,0.08)', border: '1px dashed rgba(16,185,129,0.35)' }}>
-        <i className="bi bi-info-circle-fill text-success" style={{ fontSize: '0.85rem' }}></i>
-        <span className="text-muted" style={{ fontSize: '0.68rem' }}>
-          Temp → <strong>{c.email}</strong> / <strong>{c.password}</strong>
-          {c.authCode && <> / Code: <strong>{c.authCode}</strong></>}
-        </span>
+      <div 
+        onClick={fillCreds}
+        className="p-2 rounded-3 mb-3 d-flex align-items-center justify-content-between gap-2 shadow-sm" 
+        style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', cursor: 'pointer' }}
+        title="Click to fill credentials"
+      >
+        <div className="d-flex align-items-center gap-2">
+          <i className="bi bi-key-fill text-success" style={{ fontSize: '0.9rem' }}></i>
+          <span className="text-dark" style={{ fontSize: '0.72rem' }}>
+            Demo: <strong>{c.email}</strong> / <strong>{c.password}</strong>
+            {c.authCode && <> (Code: <strong>{c.authCode}</strong>)</>}
+          </span>
+        </div>
+        <button type="button" onClick={fillCreds} className="btn btn-sm btn-success py-0 px-2 fw-semibold" style={{ fontSize: '0.68rem', borderRadius: '12px' }}>
+          Auto-Fill
+        </button>
       </div>
     );
   };
@@ -1329,7 +1224,7 @@ export default function LoginRegister({ authenticatedUser, setAuthenticatedUser,
                         <label className="form-label text-secondary small fw-semibold d-flex align-items-center gap-1">
                           <i className="bi bi-shield-lock text-danger" style={{ fontSize: '0.85rem' }}></i> 6-Digit Authenticator Code
                         </label>
-                        <input type="text" required maxLength={6} placeholder={TEMP_CREDENTIALS.admin.authCode} className="form-control rounded-3 py-2 px-3 border font-monospace text-center fw-bold" style={{ fontSize: '1rem', letterSpacing: '6px' }} value={adminCode} onChange={(e) => setAdminCode(e.target.value.replace(/\D/g, ''))} />
+                        <input type="text" maxLength={6} placeholder={TEMP_CREDENTIALS.admin.authCode} className="form-control rounded-3 py-2 px-3 border font-monospace text-center fw-bold" style={{ fontSize: '1rem', letterSpacing: '6px' }} value={adminCode} onChange={(e) => setAdminCode(e.target.value.replace(/\D/g, ''))} />
                         <div className="form-text text-muted" style={{ fontSize: '0.62rem' }}>Enter the 6-digit code from your authenticator app (Temp: 123456)</div>
                       </div>
                       <button type="submit" className="btn btn-danger w-100 py-2 rounded-pill shadow-sm fw-bold border-0 text-white">

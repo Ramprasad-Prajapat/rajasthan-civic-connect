@@ -41,12 +41,12 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
     setActiveMenuTab('overview');
   }, [authenticatedUser]);
 
-  // Live synchronization of complaints from Firestore
+  // Live synchronization of complaints from database
   useEffect(() => {
     let active = true;
     const fetchLiveStatsAndComplaints = async () => {
       try {
-        const { getComplaints } = await import('../firestoreService');
+        const { getComplaints } = await import('../apiService');
         let filters = {};
         if (activeRole === 'citizen' && authenticatedUser) {
           filters.citizenId = authenticatedUser.uid || authenticatedUser.email;
@@ -84,7 +84,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
           setComplaintsData(mapped);
         }
       } catch (err) {
-        console.error("Failed to load live Firestore complaints for dashboard:", err);
+        console.error("Failed to load live database complaints for dashboard:", err);
       }
     };
     fetchLiveStatsAndComplaints();
@@ -106,7 +106,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
     { id: 'RJC-2026-9322', category: 'Garbage Collection', ward: 'Ward No. 12', dept: 'Sanitation Department', status: 'SLA Delayed', date: '2026-05-10', priority: 'Medium', worker: 'Ramesh Meena', citizen: 'Ram Prasad', remarks: 'Worker delayed due to heatwave guidelines.', beforeImg: '🗑️ Trash heaps', afterImg: '', slaRemaining: 'Overdue 12h', feedbackPending: false, isEmergency: false, rating: 0, dateAdded: 'May 10, 2026' }
   ]);
 
-  // Citizen interactive submissions list using Firestore service
+  // Citizen interactive submissions list using API service
   const handleAddComplaint = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -127,7 +127,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
     };
 
     try {
-      const { createComplaint } = await import('../firestoreService');
+      const { createComplaint } = await import('../apiService');
       await createComplaint(newComp);
       triggerToast(`Grievance ${generatedID} successfully lodged on GovTech servers!`);
       // Update local state
@@ -156,7 +156,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
   // Update Status Handlers
   const handleUpdateStatus = async (complaintId, newStatus, additionalData = {}) => {
     try {
-      const { updateComplaintStatus } = await import('../firestoreService');
+      const { updateComplaintStatus } = await import('../apiService');
       await updateComplaintStatus(complaintId, newStatus, additionalData);
       triggerToast(`Grievance ${complaintId} status updated to ${newStatus}!`);
       
@@ -205,7 +205,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
   // Feedback Submit Helper
   const handleFeedbackSubmit = async (id, ratingVal) => {
     try {
-      const { submitFeedback } = await import('../firestoreService');
+      const { submitFeedback } = await import('../apiService');
       await submitFeedback(id, ratingVal, 'Submitted via Citizen Dashboard Desk', authenticatedUser?.uid || 'anonymous');
       setComplaintsData(prev => prev.map(c => c.id === id ? { ...c, rating: ratingVal, feedbackPending: false, status: 'Closed' } : c));
       triggerToast(`Rating score ${ratingVal}⭐ successfully synced for Grievance ${id}!`);
@@ -221,7 +221,6 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
     } else {
       if (setAuthenticatedUser) setAuthenticatedUser(null);
       localStorage.removeItem('rajcivic_user');
-      localStorage.removeItem('firebaseIdToken');
       setActivePage('Home');
     }
   };
@@ -952,7 +951,7 @@ export default function DashboardPreview({ authenticatedUser, setAuthenticatedUs
               {[
                 { title: 'Task Dispatched', msg: 'Grievance ticket RJC-2026-9921 successfully routed to executive Mohan Lal.', date: 'May 26, 2026' },
                 { title: 'SLA Warning Alert', msg: 'Grievance ticket RJC-2026-9322 has reached 90% SLA countdown threshold.', date: 'May 22, 2026' },
-                { title: 'System Node Synced', msg: 'Secure Firebase authentication portal synced successfully.', date: 'May 18, 2026' }
+                { title: 'System Node Synced', msg: 'Secure authentication portal synced successfully.', date: 'May 18, 2026' }
               ].map((n, idx) => (
                 <div key={idx} className="p-3 border rounded-3 bg-light hover-light">
                   <div className="d-flex justify-content-between align-items-center mb-1">

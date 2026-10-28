@@ -1,32 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { isFirebaseConfigured, auth as firebaseAuth } from '../firebase';
-import { createEmergency, updateEmergencyStatus } from '../firestoreService';
+import { createEmergency, updateEmergencyStatus } from '../apiService';
 
 export default function EmergencyHelp() {
   // Authentication check for auto-filling reporter details
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    if (isFirebaseConfigured && firebaseAuth) {
-      const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
-        if (user) {
-          const mPhone = '98290' + Math.floor(10000 + Math.random() * 90000);
-          const mName = user.displayName || user.email.split('@')[0];
-          setCurrentUser({
-            uid: user.uid,
-            name: mName,
-            email: user.email,
-            phone: mPhone, // Mock phone for demonstration
-            role: user.email.endsWith('.gov.in') ? 'Official Grievance Desk' : 'Verified Citizen'
-          });
-          setReporterName(mName);
-          setReporterPhone(mPhone);
-        } else {
-          setCurrentUser(null);
-        }
-      });
-      return () => unsubscribe();
-    }
+    try {
+      const u = JSON.parse(localStorage.getItem('rajcivic_user') || 'null');
+      if (u) {
+        setCurrentUser(u);
+        setReporterName(u.name || u.fullName || u.email?.split('@')[0] || '');
+        setReporterPhone(u.phone || '');
+      }
+    } catch (e) {}
   }, []);
 
   // Form Fields
@@ -275,11 +262,11 @@ export default function EmergencyHelp() {
       }
     };
 
-    // Firebase database writer
+    // Emergency API writer
     try {
       await createEmergency(emergencyData, photoFile);
     } catch (err) {
-      console.error("Firestore Emergency sync failed:", err);
+      console.error("Emergency sync failed:", err);
     }
 
     setTimeout(() => {

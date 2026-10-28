@@ -1,6 +1,4 @@
 import React, { useState, useRef, Suspense, lazy } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from './firebase';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import QuickAccess from './components/QuickAccess';
@@ -42,61 +40,34 @@ function App() {
   // Auth view mode for Login/Register component ('login' | 'register')
   const [authViewMode, setAuthViewMode] = useState('login');
 
-  // Lifted user authentication state MUST be initialized to null (NOT from localStorage)
-  const [authenticatedUser, setAuthenticatedUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  // User authentication state initialized from persistent localStorage
+  const [authenticatedUser, setAuthenticatedUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('rajcivic_user');
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      if (saved && token) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
+  });
+  const [authLoading, setAuthLoading] = useState(false);
 
   const returnToRef = useRef(null);
 
-  // Synchronize authenticatedUser state with Firebase Authentication as source of truth
+  // Synchronize authenticatedUser state with local storage on startup
   React.useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
-      setAuthLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userUid = firebaseUser.uid || firebaseUser.email.replace(/[.#$[\]]/g, '_');
-        try {
-          const { getUserProfile } = await import('./firestoreService');
-          const profile = await getUserProfile(userUid);
-          const mergedUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: profile?.fullName || firebaseUser.displayName || 'Citizen User',
-            displayName: firebaseUser.displayName || profile?.fullName || 'Citizen User',
-            photoURL: firebaseUser.photoURL || profile?.photoURL || null,
-            portal: profile?.portal || 'citizen',
-            role: profile?.role || 'Citizen',
-            rtdbNode: `/${profile?.portal || 'citizen'}s/${firebaseUser.email.replace(/[.#$[\]]/g, '_')}`,
-            ...profile
-          };
-          setAuthenticatedUser(mergedUser);
-          localStorage.setItem('rajcivic_user', JSON.stringify(mergedUser));
-        } catch (err) {
-          const fallbackUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: firebaseUser.displayName || 'Citizen User',
-            displayName: firebaseUser.displayName || 'Citizen User',
-            photoURL: firebaseUser.photoURL || null,
-            portal: 'citizen',
-            role: 'Citizen',
-            rtdbNode: `/citizens/${firebaseUser.email.replace(/[.#$[\]]/g, '_')}`
-          };
-          setAuthenticatedUser(fallbackUser);
-          localStorage.setItem('rajcivic_user', JSON.stringify(fallbackUser));
-        }
-      } else {
-        setAuthenticatedUser(null);
-        localStorage.removeItem('rajcivic_user');
-        localStorage.removeItem('firebaseIdToken');
+    try {
+      const saved = localStorage.getItem('rajcivic_user');
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      if (saved && token && !authenticatedUser) {
+        setAuthenticatedUser(JSON.parse(saved));
       }
-      setAuthLoading(false);
-    });
-
-    return () => unsubscribe();
+    } catch (e) {
+      // ignore
+    }
   }, []);
 
   const handleSetAuthenticatedUser = (user) => {
@@ -110,33 +81,29 @@ function App() {
       }
     } else {
       localStorage.removeItem('rajcivic_user');
-      localStorage.removeItem('firebaseIdToken');
+      localStorage.removeItem('token');
+      localStorage.removeItem('authToken');
     }
   };
 
   const handleSignOut = async () => {
-    try {
-      if (isFirebaseConfigured && auth) {
-        await signOut(auth);
-      }
-    } catch (err) {
-      console.error("Sign out error:", err);
-    }
     handleSetAuthenticatedUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('rajcivic_user');
+    sessionStorage.removeItem('rajcivic_active_page');
     setActivePage('Home');
   };
 
-  // Sync user profile state with Firestore if logged in
+  // Sync user profile state with API if logged in
   React.useEffect(() => {
-    import('./firestoreService').then(({ seedFirestoreOnStartup }) => {
-      seedFirestoreOnStartup();
-    }).catch(err => console.error("Firestore auto-seeding check failed:", err));
+    import('./apiService').then(({ seedOnStartup }) => { if (seedOnStartup) seedOnStartup(); }).catch(err => console.error('Auto-seeding check failed:', err));
   }, []);
 
   React.useEffect(() => {
     if (authenticatedUser && (authenticatedUser.uid || authenticatedUser.email)) {
       const userUid = authenticatedUser.uid || authenticatedUser.email.replace(/[.#$[\]]/g, '_');
-      import('./firestoreService').then(({ getUserProfile }) => {
+      import('./apiService').then(({ getUserProfile }) => {
         getUserProfile(userUid).then(profile => {
           if (profile) {
             const merged = { ...authenticatedUser, ...profile };

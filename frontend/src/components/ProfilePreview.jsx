@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { updateUserProfile } from '../firestoreService';
+import { updateUserProfile } from '../apiService';
 
 export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser, setActivePage }) {
   // Account settings edit mode state
@@ -43,9 +43,9 @@ export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser
         });
       }
       setIsEditing(false);
-      triggerToast("Your profile records have been securely updated in Firestore!");
+      triggerToast("Your profile records have been securely updated in the database!");
     } catch (err) {
-      console.error("Failed to update profile in Firestore:", err);
+      console.error("Failed to update profile in database:", err);
       alert("Failed to save changes: " + err.message);
     }
   };
@@ -229,7 +229,7 @@ export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser
                     <label className="form-label text-secondary small fw-bold">Platform Status Logs</label>
                     <div className="p-3 border rounded-3 bg-light text-muted small" style={{ fontSize: '0.74rem' }}>
                       <span className="d-block mb-1">🛡️ <strong>Encryption:</strong> TLS 1.3 Active</span>
-                      <span className="d-block">🔑 <strong>Session Expiry:</strong> Synced with secure Firebase Authentication nodes.</span>
+                      <span className="d-block">🔑 <strong>Session Expiry:</strong> Synced with secure JWT Authentication nodes.</span>
                     </div>
                   </div>
 

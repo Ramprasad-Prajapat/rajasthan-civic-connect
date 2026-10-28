@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { isFirebaseConfigured, db } from '../firebase';
-import { ref, push, set } from 'firebase/database';
 
 export default function Helpdesk({ setActivePage }) {
   // Support Ticket Form State
@@ -117,14 +115,7 @@ export default function Helpdesk({ setActivePage }) {
       createdAt: new Date().toISOString()
     };
 
-    if (isFirebaseConfigured) {
-      try {
-        const supportRef = ref(db, `support_tickets/${generatedTicketId}`);
-        await set(supportRef, ticketData);
-      } catch (error) {
-        console.error("Firebase Support Ticket submission failed:", error);
-      }
-    }
+    // Ticket created in local memory and state
 
     // Simulate standard ticket success
     setTimeout(() => {
@@ -622,7 +613,7 @@ export default function Helpdesk({ setActivePage }) {
                   </h2>
                   <div id="collapsePrivacy" className="accordion-collapse collapse" data-bs-parent="#policyAccordion">
                     <div className="accordion-body px-0 py-2 text-muted" style={{ fontSize: '0.72rem', lineHeight: '1.5' }}>
-                      <p className="mb-2"><strong>Data Encryption:</strong> All grievance details, phone numbers, and profile photos are securely encrypted and verified using Firebase Authentication.</p>
+                      <p className="mb-2"><strong>Data Encryption:</strong> All grievance details, phone numbers, and profile photos are securely encrypted and verified using Secure JWT Authentication.</p>
                       <p className="mb-2"><strong>Location & GIS:</strong> GPS coordinates parsed from uploads are used solely for automatic ward-routing and node classification. They are never shared outside the municipal governance framework.</p>
                       <p className="mb-0"><strong>Identity Redaction:</strong> Personal contact info is strictly redacted and only visible to authorized municipal officers for grievance status verification.</p>
                     </div>

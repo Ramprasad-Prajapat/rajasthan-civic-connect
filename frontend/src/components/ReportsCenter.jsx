@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { isFirebaseConfigured, db } from '../firebase';
-import { ref, onValue } from 'firebase/database';
 
 export default function ReportsCenter({ selectedReportTab, setSelectedReportTab }) {
   // 10 Rajasthan Sambhags & Dynamic District Mapping
@@ -38,7 +36,7 @@ export default function ReportsCenter({ selectedReportTab, setSelectedReportTab 
     let active = true;
     const loadComplaints = async () => {
       try {
-        const { getComplaints } = await import('../firestoreService');
+        const { getComplaints } = await import('../apiService');
         const data = await getComplaints({});
         if (active) {
           setDbComplaints(data);
@@ -343,9 +341,9 @@ export default function ReportsCenter({ selectedReportTab, setSelectedReportTab 
               timestamp: new Date().toISOString()
             };
 
-            import('../firestoreService').then(({ saveReport }) => {
+            import('../apiService').then(({ saveReport }) => {
               saveReport(reportMetadata);
-            }).catch(err => console.error("Failed to save report metadata to Firestore:", err));
+            }).catch(err => console.error("Failed to save report metadata to database:", err));
 
             let fileContent = "";
             let fileName = `RAJCIVIC_${selectedReportTab.toUpperCase()}_${filters.district.toUpperCase()}_${filters.month.replace(' ', '_')}`;

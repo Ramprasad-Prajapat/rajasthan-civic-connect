@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMyComplaints, getComplaints, submitFeedback, reopenComplaint } from '../firestoreService';
+import { getMyComplaints, getComplaints, submitFeedback, reopenComplaint } from '../apiService';
 
 export default function MyComplaints({ authenticatedUser, setActivePage }) {
   const [complaints, setComplaints] = useState([]);

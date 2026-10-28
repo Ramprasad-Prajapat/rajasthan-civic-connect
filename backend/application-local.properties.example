@@ -1,0 +1,18 @@
+# Rajasthan Civic Connect - Local Configuration Template
+# Copy this file to application-local.properties and customize credentials.
+# Do NOT commit application-local.properties to source control.
+
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+
+spring.datasource.url=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/civic_connect?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+spring.datasource.username=civic_app
+spring.datasource.password=CHANGE_ME
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# Security & JWT configuration
+app.jwt.secret=CHANGE_ME_LONG_RANDOM_BASE64_OR_HEX_SECRET_KEY_MINIMUM_256_BITS
+app.jwt.expiration-ms=86400000
+
+# Development demo data seeding
+app.seed-demo-users=true

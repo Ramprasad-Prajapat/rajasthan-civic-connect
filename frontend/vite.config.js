@@ -13,9 +13,6 @@ export default defineConfig({
             if (id.includes('react') || id.includes('react-dom')) {
               return 'vendor-react';
             }
-            if (id.includes('firebase')) {
-              return 'vendor-firebase';
-            }
             if (id.includes('leaflet') || id.includes('react-leaflet')) {
               return 'vendor-leaflet';
             }

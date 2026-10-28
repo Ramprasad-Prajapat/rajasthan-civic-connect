@@ -1,7 +1,3 @@
-# ==========================================
-# RAJCIVIC CONNECT - ROOT GITIGNORE
-# ==========================================
-
 # Dependencies
 node_modules/
 **/node_modules/
@@ -9,64 +5,41 @@ node_modules/
 # Build outputs
 dist/
 **/dist/
-dist-ssr/
+target/
+**/target/
 
-# Environment / secrets
+# Local runtime & agent state
+.agent/
+**/.agent/
+
+# Environment and secrets
 .env
 .env.*
 !.env.example
-!.env.production.example
-!.env.development.example
-
-# Firebase service account / private credentials
-*-firebase-adminsdk-*.json
-*firebase-adminsdk*.json
-firebase-service-account*.json
-serviceAccount*.json
-
-# Local database / runtime-generated data
-backups/
-*.db
-*.sqlite
-*.sqlite3
+!frontend/.env.example
+backend/application-local.properties
+**/application-local.properties
 
 # Logs
-logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+**/*.log
 
-# Coverage / test artifacts
-coverage/
-playwright-report/
-test-results/
-.vitest/
+# IDE files
+.idea/
+.vscode/
+*.iml
 
-# Temporary patches / generated working files
-*.patch
-*.tmp
-*.bak
+# Archives
+*.zip
+*.tar.gz
 
-# OS files
+# Database SQL dumps (except schema.sql)
+*.sql
+!database/schema.sql
+
+# Agent instruction files
+AGENT_*.md
+
+# OS metadata
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/*
-!.vscode/extensions.json
-.idea/
-*.suo
-*.sw?
-*.njsproj
-*.sln
-
-# Deployment / runtime temporary files
-.pids/
-*.pid
-
-# ==========================================
-# Keep documentation, source code, tests,
-# CI/CD workflows and deployment configs
-# ==========================================
