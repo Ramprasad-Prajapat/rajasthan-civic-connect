@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Service managing grievance workflow transitions: worker assignment, reopen, and deletion.
+ * Service managing grievance workflow transitions: reopen and deletion.
  */
 @Service
 public class ComplaintWorkflowService {
@@ -24,61 +24,18 @@ public class ComplaintWorkflowService {
     private final ComplaintRepository complaintRepository;
     private final ComplaintTimelineRepository timelineRepository;
     private final ComplaintMediaRepository mediaRepository;
-    private final NotificationService notificationService;
-    private final AuditLogService auditLogService;
     private final ComplaintMediaService mediaService;
 
     public ComplaintWorkflowService(
             ComplaintRepository complaintRepository,
             ComplaintTimelineRepository timelineRepository,
             ComplaintMediaRepository mediaRepository,
-            NotificationService notificationService,
-            AuditLogService auditLogService,
             ComplaintMediaService mediaService
     ) {
         this.complaintRepository = complaintRepository;
         this.timelineRepository = timelineRepository;
         this.mediaRepository = mediaRepository;
-        this.notificationService = notificationService;
-        this.auditLogService = auditLogService;
         this.mediaService = mediaService;
-    }
-
-    @Transactional
-    public Map<String, Object> assignWorker(String idOrCode, Map<String, Object> body, User staff) {
-        if (!Constants.STAFF_ROLES.contains(staff.getRole().toUpperCase())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Only staff can assign workers");
-        }
-
-        Complaint complaint = findByIdOrCode(idOrCode).orElse(null);
-        if (complaint == null) {
-            return Map.of("message", "Worker assigned successfully", "status", "Assigned");
-        }
-
-        String workerName = body.get("workerName") != null ? body.get("workerName").toString() : "Field Executive";
-        complaint.setStatus("Assigned");
-        complaintRepository.save(complaint);
-
-        ComplaintTimeline timelineEvent = new ComplaintTimeline(
-                complaint.getId(),
-                "Assigned",
-                "Worker Assigned",
-                "Task assigned to field executive: " + workerName,
-                staff.getName() != null ? staff.getName() : "Officer",
-                staff.getRole()
-        );
-        timelineRepository.save(timelineEvent);
-
-        notificationService.createNotification(
-                complaint.getCitizenId(),
-                "Field Worker Assigned: " + complaint.getComplaintCode(),
-                "Field executive " + workerName + " has been assigned to address your grievance.",
-                "WORKER",
-                complaint.getComplaintCode()
-        );
-
-        auditLogService.record(staff, "ASSIGN_WORKER", "COMPLAINT", complaint.getComplaintCode(), "Assigned to " + workerName);
-        return Map.of("message", "Worker assigned successfully", "status", "Assigned");
     }
 
     @Transactional
@@ -113,7 +70,6 @@ public class ComplaintWorkflowService {
         );
         timelineRepository.save(timelineEvent);
 
-        auditLogService.record(caller, "REOPEN_COMPLAINT", "COMPLAINT", complaint.getComplaintCode(), "Reopened ticket: " + reason);
         return Map.of("message", "Grievance successfully reopened.", "status", "Reopened");
     }
 
