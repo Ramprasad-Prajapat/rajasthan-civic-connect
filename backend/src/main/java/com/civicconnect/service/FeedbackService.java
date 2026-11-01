@@ -1,4 +1,6 @@
 package com.civicconnect.service;
+
+import com.civicconnect.dto.FeedbackRequest;
 import com.civicconnect.entity.Feedback;
 import com.civicconnect.entity.User;
 import com.civicconnect.exception.ApiException;
@@ -9,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Service managing citizen satisfaction feedback ratings.
@@ -26,16 +27,16 @@ public class FeedbackService {
     }
 
     @Transactional
-    public Feedback submitFeedback(Map<String, Object> payload, User caller) {
+    public Feedback submitFeedback(FeedbackRequest request, User caller) {
         if (caller == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Authentication required to submit feedback");
         }
 
-        String complaintId = payload.get("complaintId") != null && !payload.get("complaintId").toString().isBlank() ?
-                payload.get("complaintId").toString().trim() : "RJCIVIC-GENERAL";
+        String complaintId = request.complaintId() != null && !request.complaintId().isBlank() ?
+                request.complaintId().trim() : "RJCIVIC-GENERAL";
 
-        Integer rating = payload.get("rating") instanceof Number num ? num.intValue() : 5;
-        String comment = payload.get("comment") != null ? payload.get("comment").toString() : "";
+        Integer rating = request.rating() != null ? request.rating() : 5;
+        String comment = request.comment() != null ? request.comment() : "";
 
         Feedback feedback = new Feedback(complaintId, caller.getId(), caller.getName(), rating, comment);
         return feedbackRepository.save(feedback);

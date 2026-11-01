@@ -1,8 +1,10 @@
 package com.civicconnect.controller;
 
+import com.civicconnect.dto.FeedbackRequest;
 import com.civicconnect.entity.Feedback;
 import com.civicconnect.entity.User;
 import com.civicconnect.service.FeedbackService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +27,7 @@ public class FeedbackController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> submitFeedback(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody FeedbackRequest body,
             @AuthenticationPrincipal User caller
     ) {
         Feedback saved = feedbackService.submitFeedback(body, caller);

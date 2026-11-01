@@ -709,6 +709,47 @@ public class CivicConnectIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void testFeedbackRatingValidationBounds() throws Exception {
+        String citizenEmail = "feedback_val_" + System.currentTimeMillis() + "@civic.local";
+        createCitizenUser(citizenEmail, "Citizen@123");
+        String token = obtainToken(citizenEmail, "Citizen@123", "citizen");
+
+        // 1. Rating 0 -> 400
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"1\",\"rating\":0,\"comment\":\"Bad\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error").isString());
+
+        // 2. Rating 6 -> 400
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"1\",\"rating\":6,\"comment\":\"Good\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error").isString());
+
+        // 3. Negative rating -1 -> 400
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"1\",\"rating\":-1,\"comment\":\"Negative\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // 4. Valid rating 5 -> 200
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"1\",\"rating\":5,\"comment\":\"Excellent\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
     private String obtainToken(String email, String password, String portal) throws Exception {
         LoginRequest req = new LoginRequest(email, password, portal != null ? portal : "citizen");
         MvcResult res = mockMvc.perform(post("/api/auth/login")
