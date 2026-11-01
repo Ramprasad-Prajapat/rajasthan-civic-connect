@@ -126,12 +126,4 @@ public class ComplaintController {
     ) {
         return ResponseEntity.ok(workflowService.reopenComplaint(idOrCode, body, caller));
     }
-
-    @DeleteMapping("/{idOrCode}")
-    public ResponseEntity<Map<String, String>> deleteComplaint(
-            @PathVariable String idOrCode,
-            @AuthenticationPrincipal User caller
-    ) {
-        return ResponseEntity.ok(workflowService.deleteComplaint(idOrCode, caller));
-    }
 }

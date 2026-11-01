@@ -685,6 +685,17 @@ public class CivicConnectIntegrationTest {
         assertEquals(threadCount, uniqueCodes.size(), "All " + threadCount + " generated complaint codes must be unique");
     }
 
+    @Test
+    void testDeleteComplaintEndpointNotSupported() throws Exception {
+        String adminEmail = "admin_del_" + System.currentTimeMillis() + "@civic.local";
+        createStaffUser(adminEmail, "Admin@123", Constants.ROLE_ADMIN);
+        String token = obtainToken(adminEmail, "Admin@123", "admin");
+
+        mockMvc.perform(delete("/api/complaints/1")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
     private String obtainToken(String email, String password, String portal) throws Exception {
         LoginRequest req = new LoginRequest(email, password, portal != null ? portal : "citizen");
         MvcResult res = mockMvc.perform(post("/api/auth/login")

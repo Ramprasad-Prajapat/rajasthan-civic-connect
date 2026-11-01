@@ -73,24 +73,6 @@ public class ComplaintWorkflowService {
         return Map.of("message", "Grievance successfully reopened.", "status", "Reopened");
     }
 
-    @Transactional
-    public Map<String, String> deleteComplaint(String idOrCode, User caller) {
-        Complaint complaint = findByIdOrCode(idOrCode).orElse(null);
-        if (complaint == null) {
-            return Map.of("message", "Complaint deleted successfully");
-        }
-
-        boolean isStaff = Constants.STAFF_ROLES.contains(caller.getRole().toUpperCase());
-        boolean isOwner = caller.getId().equals(complaint.getCitizenId());
-        if (!isStaff && !isOwner) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Access denied");
-        }
-
-        mediaRepository.deleteByComplaintId(complaint.getId());
-        complaintRepository.delete(complaint);
-        return Map.of("message", "Complaint deleted successfully");
-    }
-
     private Optional<Complaint> findByIdOrCode(String idOrCode) {
         Optional<Complaint> byCode = complaintRepository.findByComplaintCode(idOrCode);
         if (byCode.isPresent()) return byCode;
