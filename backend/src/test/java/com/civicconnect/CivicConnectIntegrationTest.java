@@ -750,6 +750,23 @@ public class CivicConnectIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true));
     }
 
+    @Test
+    void testRequestSizeLimitExceededReturns413PayloadTooLarge() throws Exception {
+        createCitizenUser("size_limit_cit@test.local", "Test@123");
+        String token = obtainToken("size_limit_cit@test.local", "Test@123", "citizen");
+
+        // Payload with Content-Length larger than 41943040 bytes returns 413 Payload Too Large
+        mockMvc.perform(post("/api/complaints")
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Length", 50000000L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Too large\",\"category\":\"WATER\",\"description\":\"Oversized request\"}"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error").value("Payload Too Large"))
+                .andExpect(jsonPath("$.message").isString());
+    }
+
     private String obtainToken(String email, String password, String portal) throws Exception {
         LoginRequest req = new LoginRequest(email, password, portal != null ? portal : "citizen");
         MvcResult res = mockMvc.perform(post("/api/auth/login")

@@ -34,13 +34,15 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RequestSizeLimitFilter requestSizeLimitFilter;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, RequestSizeLimitFilter requestSizeLimitFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.requestSizeLimitFilter = requestSizeLimitFilter;
     }
 
     @Bean
@@ -79,6 +81,7 @@ public class SecurityConfig {
                             response.getWriter().write(objectMapper.writeValueAsString(body));
                         })
                 )
+                .addFilterBefore(requestSizeLimitFilter, org.springframework.security.web.context.SecurityContextHolderFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
