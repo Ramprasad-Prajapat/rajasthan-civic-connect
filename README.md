@@ -2,73 +2,64 @@
 
 Rajasthan Civic Connect is a unified citizen grievance redressal and municipal governance platform built for Rajasthan state civic administration. It empowers citizens to lodge and track civic complaints with geo-tagging, photos, and auto-department routing, while enabling department officers to manage grievances within their scoped department and administrators to manage departments, officers, users, and state-wide grievance resolution.
 
-## Technology Stack
-- **Frontend:** React 19, Vite, Bootstrap 5, Leaflet Maps
-- **Backend:** Java 21, Spring Boot 3.5, Spring Security (stateless JWT), Spring Data JPA, Hibernate
-- **Database:** MySQL 8.0+ InnoDB (port `3306`, database `civic_connect`, `utf8mb4_unicode_ci`)
-- **Authentication:** Stateless JWT bearer tokens with BCrypt password hashing and role-based access control
+---
 
-## Architecture & Features
+## Tech Stack
 
-### 1. Citizen Portal
-- **Lodge Grievance:** Submit complaints with title, description, category, district, ULB, ward, GPS coordinates, and photo proof.
-- **Auto-Department Routing & SLA:** Automatically mapped to municipal departments (e.g. Water, Sanitation, Electrical, Sewerage, PWD) with target SLA resolution deadlines.
-- **Draft Persistence:** Automatic complaint draft sync to MySQL (`complaint_drafts`), restored across sessions.
-- **My Complaints & Timeline:** Track ticket progress with chronological status milestones.
-- **Profile & Security:** Update profile details and change password securely.
-
-### 2. Department Officer Portal
-- **Department-Scoped Access:** Officers are strictly scoped to their assigned municipal department (`users.department_id`). Cross-department updates are rejected with `403 Forbidden`.
-- **Department Metrics:** Dashboard count cards: Total, Submitted, In Progress, Resolved, and SLA Breaches.
-- **Workflow Management:** Filter grievances, inspect before/after photos, and transition statuses (`InProgress`, `Resolved`, `Closed`) with remarks and citizen notifications.
-
-### 3. Administrator Portal
-- **State-Wide Overview:** Real-time aggregate statistics on complaints, resolution rates, officer counts, citizen accounts, and SLA breaches.
-- **Department Management:** Full CRUD on departments, active state toggling, and 409 Conflict protection preventing deletion of departments with active grievances or officers.
-- **Officer Management:** Enrolls department officers with initial credentials, department assignment, and active status toggling.
-- **Complaints & Reassignment:** Search all state grievances, reassign tickets across departments with timeline logging, and update statuses.
-- **User Directory:** Read-only listing of all registered citizens and staff.
+- **Backend:** Java 21, Spring Boot 3.5, Spring Security, Spring Data JPA, Hibernate, JWT (HS256)
+- **Frontend:** React 19, Vite (React build tool), plain CSS, browser `fetch`
+- **Database:** MySQL 8.0+ (`civic_connect`, port `3306`, `utf8mb4_unicode_ci`)
+- **Build & Package:** Apache Maven 3.9+ / Maven Wrapper (`mvnw`, `mvnw.cmd`) & npm
+- **Presentation Libraries:** Bootstrap 5, Bootstrap Icons, Leaflet Maps
 
 ---
 
-## Project Structure
+## Folder Tree
+
 ```text
 rajasthan-civic-connect/
-├── README.md
-├── run-project.bat
-├── stop-project.bat
-├── .gitignore
-├── frontend/     React + Vite: package.json, .env.local, index.html, src/
-├── backend/      Java Spring Boot: pom.xml, application-local.properties, src/
-├── database/     schema.sql (MySQL DDL structure)
-├── scripts/      start-all.mjs, stop-all.mjs, verify-all.mjs, smoke-test.mjs, setup-db.mjs
-├── docs/         API_CONTRACT.md
-└── .agent/       Operational logs and runtime metadata
+├── README.md                           # Project documentation and setup guide
+├── run-project.bat                     # Starts backend and frontend development servers
+├── stop-project.bat                    # Stops backend and frontend development servers
+├── test-all.bat                        # Runs backend Maven tests and frontend production build
+├── .gitignore                          # Git ignore definitions
+├── backend/                            # Spring Boot backend
+│   ├── mvnw                            # Maven Wrapper (Unix)
+│   ├── mvnw.cmd                        # Maven Wrapper (Windows)
+│   ├── .mvn/wrapper/                   # Maven Wrapper configuration
+│   ├── pom.xml                         # Maven project dependencies
+│   ├── application-local.properties    # Local configuration & credentials (git-ignored)
+│   ├── application-local.properties.example # Local configuration template
+│   └── src/                            # Java 21 source code & tests
+├── frontend/                           # React frontend
+│   ├── package.json                    # Frontend dependencies & npm scripts (dev, build, preview)
+│   ├── vite.config.js                  # Vite configuration
+│   ├── index.html                      # Entry HTML document
+│   ├── .env.example                    # Frontend environment variables template
+│   ├── .env.local                      # Local frontend environment variables (git-ignored)
+│   ├── public/                         # Static image assets
+│   └── src/                            # React JSX components, plain CSS, apiService.js
+├── database/                           # Database definitions
+│   └── schema.sql                      # MySQL database schema (8 tables)
+└── docs/                               # Project documentation
+    └── API_CONTRACT.md                 # REST API specification & status codes
 ```
 
 ---
 
-## Demo Accounts
+## Requirements
 
-| Role | Email | Password | Assigned Scope / Permissions |
-|---|---|---|---|
-| **Citizen** | `citizen@civic.local` | `Citizen@123` | Citizen Portal: Lodge complaints, draft sync, track tickets |
-| **Department Officer (Water)** | `officer@civic.local` | `Officer@123` | Scoped to Water Department tickets and metrics |
-| **Department Officer (Sanitation)** | `sanitation.officer@civic.local` | `Officer@123` | Scoped to Sanitation Department tickets and metrics |
-| **Admin** | `admin@civic.local` | `Admin@123` | Full admin governance: departments, officers, users, stats |
+- **Java Development Kit (JDK):** JDK 21+ (OpenJDK or Oracle JDK)
+- **Node.js & npm:** Node.js v18.0.0 or later with npm (for frontend React dev server & build)
+- **Database Server:** MySQL Server 8.0+ running on `127.0.0.1:3306`
+- **Build Tool:** Maven 3.9+ or the included Maven Wrapper (`backend/mvnw.cmd` on Windows)
 
 ---
 
-## Getting Started
+## Database Setup
 
-### Prerequisites
-- **Node.js:** v18.0.0 or later (tested on Node v20 / v24)
-- **Java Development Kit (JDK):** JDK 21+ (OpenJDK or Oracle JDK)
-- **Build Tool:** Apache Maven 3.9+ (or IntelliJ IDEA Maven)
-- **Database Server:** MySQL Server 8.0+ running on `127.0.0.1:3306`
+Execute these 5 SQL commands in MySQL (e.g. via MySQL Command Line Client or Workbench) to set up databases and user permissions:
 
-### Database Setup
-Ensure databases `civic_connect` and `civic_connect_test` exist on MySQL 3306 with user `civic_app`:
 ```sql
 CREATE DATABASE IF NOT EXISTS civic_connect CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS civic_connect_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -79,8 +70,12 @@ GRANT ALL PRIVILEGES ON civic_connect_test.* TO 'civic_app'@'127.0.0.1', 'civic_
 FLUSH PRIVILEGES;
 ```
 
-### Configuration
-1. **Backend:** Configured in `backend/application-local.properties`:
+---
+
+## Configuration
+
+1. **Backend:**
+   Copy `backend/application-local.properties.example` to `backend/application-local.properties`:
    ```properties
    MYSQL_HOST=127.0.0.1
    MYSQL_PORT=3306
@@ -90,35 +85,81 @@ FLUSH PRIVILEGES;
    app.jwt.secret=aa35c6cdabf9fe2f1fc071fc4f50c951754a4c44f572904959262ebb8e9ae703
    app.seed-demo-users=true
    ```
-2. **Frontend:** Configured in `frontend/.env.local`:
+
+2. **Frontend:**
+   Copy `frontend/.env.example` to `frontend/.env.local`:
    ```properties
    VITE_API_BASE_URL=http://localhost:8080/api
    ```
 
-### Running the Application
-To start both backend and frontend servers:
+---
+
+## Running the Application
+
+To start both the Spring Boot backend and Vite React frontend in separate windows:
 ```bat
 run-project.bat
 ```
-- **Backend API:** `http://localhost:8080/api`
+- **Backend Health:** `http://localhost:8080/api/health`
 - **Frontend UI:** `http://localhost:5173`
 
-To stop all background servers cleanly:
+To stop all running application server windows:
 ```bat
 stop-project.bat
 ```
 
-To run the complete verification suite (tests, package, smoke test, restart persistence, frontend build):
-```bash
-node scripts/verify-all.mjs
+---
+
+## Testing
+
+To run the complete automated test suite (backend JUnit tests via Maven Wrapper and frontend production build via Vite):
+```bat
+test-all.bat
 ```
+
+---
+
+## Roles and Permissions
+
+- **Citizen (`ROLE_CITIZEN`):**
+  - Lodge grievances with title, description, category, district, ULB, GPS coordinates, and photo proof.
+  - Automatic category-to-department routing (e.g. Water, Sanitation, Road, Drainage).
+  - Draft autosave to MySQL (`complaint_drafts`), restored across logins.
+  - View own complaints (`/api/complaints/my`), track chronological timeline, and submit satisfaction feedback.
+  - Update profile details and change password.
+
+- **Department Officer (`ROLE_OFFICER`):**
+  - Scoped strictly to assigned department (`users.department_id`).
+  - View complaints assigned to own department only. Attempts to view or update other departments return `403 Forbidden`.
+  - View real-time department metrics: Total, Submitted, In Progress, Resolved, and Overdue SLA.
+  - Update grievance status (`InProgress`, `Resolved`, `Closed`) with official remarks, updating citizen timeline and notifications.
+
+- **Administrator (`ROLE_ADMIN`):**
+  - View state-wide aggregate metrics across all departments and districts.
+  - Department management: Create, update, toggle active status, and delete (protected by 409 Conflict if complaints or officers exist).
+  - Officer management: Enroll department officers with initial credentials and department assignments; toggle active/disabled status.
+  - Complaints governance: Search all complaints, reassign grievances between departments with timeline logging, and update statuses.
+  - User directory: View all registered citizens and officers.
+
+---
+
+## Demo Logins (Development Only)
+
+When `app.seed-demo-users=true` is enabled in `application-local.properties`, the following accounts are available:
+
+| Role | Email | Password | Scope / Permissions |
+|---|---|---|---|
+| **Citizen** | `citizen@civic.local` | `Citizen@123` | Citizen Portal: Lodge complaints, draft sync, track tickets |
+| **Department Officer (Water)** | `officer@civic.local` | `Officer@123` | Scoped to Water Department tickets and metrics |
+| **Department Officer (Sanitation)** | `sanitation.officer@civic.local` | `Officer@123` | Scoped to Sanitation Department tickets and metrics |
+| **Administrator** | `admin@civic.local` | `Admin@123` | Full governance: departments, officers, users, stats |
 
 ---
 
 ## 5 Practical SQL Verification Queries
 
 ```sql
--- 1. List active complaints grouped by department and status
+-- 1. Active complaints grouped by department and status
 SELECT d.name AS department, c.status, COUNT(*) AS total_tickets
 FROM civic_connect.complaints c
 JOIN civic_connect.departments d ON c.department_id = d.id
@@ -146,24 +187,23 @@ FROM civic_connect.users u
 JOIN civic_connect.departments d ON u.department_id = d.id
 WHERE u.role IN ('Department Officer', 'Officer');
 
--- 5. Full chronological audit timeline for a specific complaint
-SELECT t.action, t.status, t.remarks, t.performed_by, t.role, t.timestamp
+-- 5. Full chronological timeline for a specific complaint
+SELECT t.title, t.status, t.description, t.updated_by, t.updated_by_role, t.created_at
 FROM civic_connect.complaint_timeline t
 WHERE t.complaint_id = 1
-ORDER BY t.timestamp ASC;
+ORDER BY t.created_at ASC;
 ```
 
 ---
 
-## Git Quick-Start
-```bash
-# Check repository status
-git status
+## API Documentation
 
-# View commit history
-git log --oneline -5
+For the full specification of HTTP methods, routes, request/response JSON schemas, and HTTP status codes, see [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
 
-# Run test suite
-mvn test -f backend/pom.xml
-npm run build --prefix frontend
-```
+---
+
+## Known Limitations
+
+- Mobile responsive design is desktop-first; mobile view uses standard responsive collapse.
+- Email and SMS notifications are simulated via database table `notifications`.
+- Geocoding and reverse geocoding rely on browser GPS and client-side coordinate accuracy.
