@@ -27,7 +27,9 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import javax.sql.DataSource;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.util.Base64;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -511,6 +513,123 @@ public class CivicConnectIntegrationTest {
 
         // Notifications persistence
         assertFalse(notificationRepository.findByUserIdOrderByCreatedAtDesc(citUser.getId()).isEmpty(), "Notification must persist in MySQL");
+    }
+
+    @Test
+    void test14_CorsPreflightAndAllowedOrigin() throws Exception {
+        mockMvc.perform(options("/api/complaints")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type, Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+
+        mockMvc.perform(options("/api/departments")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+    }
+
+    @Test
+    void test15_UnauthenticatedRoutesReturn401Sweep() throws Exception {
+        String[] protectedGetRoutes = {
+                "/api/complaints",
+                "/api/complaints/my",
+                "/api/complaints/draft",
+                "/api/admin/stats",
+                "/api/admin/officers",
+                "/api/admin/users",
+                "/api/department/stats",
+                "/api/departments/my/stats",
+                "/api/auth/me",
+                "/api/notifications"
+        };
+
+        for (String route : protectedGetRoutes) {
+            mockMvc.perform(get(route))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Unauthorized: Invalid or missing token"));
+        }
+    }
+
+    @Test
+    void test16_CompleteComplaintLifecycleWithPhotoAndTimelineAndNotification() throws Exception {
+        // Ensure Water Department exists
+        Department waterDept = departmentRepository.findByNameIgnoreCase("Water Department")
+                .orElseGet(() -> departmentRepository.save(new Department("Water Department", "WTR", "Water supply and maintenance", "0141-222222")));
+
+        String citizenEmail = "lifecycle_cit_" + System.currentTimeMillis() + "@test.local";
+
+        // 1. Citizen registration
+        RegisterRequest regReq = new RegisterRequest("Lifecycle Citizen", citizenEmail, "Password@123", "9876543210", "Citizen", "citizen");
+        MvcResult regRes = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(regReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.user.role").value(Constants.ROLE_CITIZEN))
+                .andReturn();
+        String citToken = objectMapper.readTree(regRes.getResponse().getContentAsString()).get("token").asText();
+
+        // 2. Citizen login
+        String loginToken = obtainToken(citizenEmail, "Password@123", "citizen");
+        assertNotNull(loginToken);
+
+        // 3. Citizen creates complaint with photo
+        String photoBase64 = "data:image/jpeg;base64," + Base64.getEncoder().encodeToString("photo-evidence-test".getBytes(StandardCharsets.UTF_8));
+        Map<String, Object> compReq = Map.of(
+                "title", "Lifecycle Water Pipe Burst",
+                "description", "Water leakage on street road",
+                "category", "water",
+                "district", "Jaipur",
+                "ulbName", "Nagar Nigam Jaipur",
+                "priority", "High",
+                "photo", photoBase64
+        );
+        MvcResult compRes = mockMvc.perform(post("/api/complaints")
+                        .header("Authorization", "Bearer " + citToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(compReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.complaintId").isString())
+                .andExpect(jsonPath("$.departmentName").value("Water Department"))
+                .andReturn();
+
+        JsonNode compNode = objectMapper.readTree(compRes.getResponse().getContentAsString());
+        String ticketCode = compNode.get("complaintId").asText();
+        Long compId = compNode.get("id").asLong();
+        Long deptId = compNode.get("departmentId").asLong();
+
+        // Verify photo persisted in complaint_media
+        assertFalse(mediaRepository.findByComplaintIdOrderByCreatedAtAsc(compId).isEmpty(), "Media photo must persist");
+
+        // 4. Officer of matching department logs in and sees complaint
+        String offEmail = "water_off_" + System.currentTimeMillis() + "@test.local";
+        createOfficerUser(offEmail, "Officer@123", deptId);
+        String officerToken = obtainToken(offEmail, "Officer@123", "department");
+
+        mockMvc.perform(get("/api/complaints").header("Authorization", "Bearer " + officerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.complaintId == '" + ticketCode + "')]").exists());
+
+        // 5. Officer updates status to InProgress with remark
+        mockMvc.perform(put("/api/complaints/" + ticketCode + "/status")
+                        .header("Authorization", "Bearer " + officerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", "InProgress", "remark", "Team dispatched"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("InProgress"));
+
+        // 6. Check timeline events (Submitted + InProgress)
+        Complaint complaintFromDb = complaintRepository.findByComplaintCode(ticketCode).orElseThrow();
+        assertEquals("InProgress", complaintFromDb.getStatus());
+        assertTrue(timelineRepository.findByComplaintIdOrderByCreatedAtAsc(compId).size() >= 2, "Timeline must log both events");
+
+        // 7. Check citizen notification created
+        User citizenUser = userRepository.findByEmail(citizenEmail).orElseThrow();
+        assertFalse(notificationRepository.findByUserIdOrderByCreatedAtDesc(citizenUser.getId()).isEmpty(), "Citizen must receive notification");
     }
 
     private String obtainToken(String email, String password, String portal) throws Exception {
