@@ -64,59 +64,43 @@ public class ComplaintService {
         SlaCalculator.SlaResult sla = SlaCalculator.calculateSla(priority, false);
         String prefix = ComplaintCodeGenerator.generatePrefix(request.district(), request.ulbName(), false);
 
-        Complaint savedComplaint = null;
-        int maxRetries = 5;
+        Complaint complaint = new Complaint();
+        complaint.setComplaintCode("TMP-" + UUID.randomUUID());
+        complaint.setTitle(request.title() != null && !request.title().isBlank() ? request.title() : "Civic Issue");
+        complaint.setDescription(request.description() != null ? request.description() : "");
+        complaint.setCategory(request.category());
+        complaint.setSubCategory(request.subCategory());
 
-        for (int attempt = 0; attempt < maxRetries; attempt++) {
-            long nextSeq = resolveNextSequence(prefix) + attempt;
-            String ticketCode = ComplaintCodeGenerator.formatCode(prefix, nextSeq);
+        complaint.setDistrict(request.district());
+        complaint.setUlbType(request.ulbType());
+        complaint.setUlbName(request.ulbName());
+        complaint.setWardNumber(request.wardNumber());
+        complaint.setAreaColony(request.areaColony());
+        complaint.setAddress(request.address());
 
-            Complaint complaint = new Complaint();
-            complaint.setComplaintCode(ticketCode);
-            complaint.setTitle(request.title() != null && !request.title().isBlank() ? request.title() : "Civic Issue");
-            complaint.setDescription(request.description() != null ? request.description() : "");
-            complaint.setCategory(request.category());
-            complaint.setSubCategory(request.subCategory());
+        complaint.setLatitude(request.latitude());
+        complaint.setLongitude(request.longitude());
+        complaint.setAccuracy(request.accuracy());
+        complaint.setLocationSource(request.locationSource() != null ? request.locationSource() : "CURRENT_LOCATION");
 
-            complaint.setDistrict(request.district());
-            complaint.setUlbType(request.ulbType());
-            complaint.setUlbName(request.ulbName());
-            complaint.setWardNumber(request.wardNumber());
-            complaint.setAreaColony(request.areaColony());
-            complaint.setAddress(request.address());
+        complaint.setDepartment(department);
+        complaint.setDepartmentId(department.getId());
+        complaint.setDepartmentName(department.getName());
 
-            complaint.setLatitude(request.latitude());
-            complaint.setLongitude(request.longitude());
-            complaint.setAccuracy(request.accuracy());
-            complaint.setLocationSource(request.locationSource() != null ? request.locationSource() : "CURRENT_LOCATION");
+        complaint.setPriority(priority);
+        complaint.setSlaHours(sla.slaHours());
+        complaint.setSlaDeadline(sla.slaDeadline());
+        complaint.setStatus(Constants.STATUS_SUBMITTED);
 
-            complaint.setDepartment(department);
-            complaint.setDepartmentId(department.getId());
-            complaint.setDepartmentName(department.getName());
+        complaint.setCitizenId(citizen.getId());
+        complaint.setCitizenName(citizen.getName());
+        complaint.setCitizenEmail(citizen.getEmail());
+        complaint.setCitizenPhone(citizen.getPhone());
 
-            complaint.setPriority(priority);
-            complaint.setSlaHours(sla.slaHours());
-            complaint.setSlaDeadline(sla.slaDeadline());
-            complaint.setStatus(Constants.STATUS_SUBMITTED);
-
-            complaint.setCitizenId(citizen.getId());
-            complaint.setCitizenName(citizen.getName());
-            complaint.setCitizenEmail(citizen.getEmail());
-            complaint.setCitizenPhone(citizen.getPhone());
-
-            try {
-                savedComplaint = complaintRepository.saveAndFlush(complaint);
-                break;
-            } catch (DataIntegrityViolationException ex) {
-                if (attempt == maxRetries - 1) {
-                    throw new ApiException(HttpStatus.CONFLICT, "Unable to assign unique ticket code.");
-                }
-            }
-        }
-
-        if (savedComplaint == null) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create complaint record");
-        }
+        Complaint savedComplaint = complaintRepository.saveAndFlush(complaint);
+        String ticketCode = ComplaintCodeGenerator.formatCode(prefix, savedComplaint.getId());
+        savedComplaint.setComplaintCode(ticketCode);
+        savedComplaint = complaintRepository.saveAndFlush(savedComplaint);
 
         mediaService.saveMedia(savedComplaint.getId(), request.photo(), "PHOTO_BEFORE");
         mediaService.saveMedia(savedComplaint.getId(), request.beforePhotos(), "PHOTO_BEFORE");
@@ -144,26 +128,11 @@ public class ComplaintService {
         return ComplaintResponse.fromEntity(savedComplaint, List.of(timelineDto));
     }
 
-    private Department resolveDepartment(String mappedDeptName) {
+    private synchronized Department resolveDepartment(String mappedDeptName) {
         return departmentRepository.findByNameIgnoreCase(mappedDeptName)
                 .or(() -> departmentRepository.findByNameIgnoreCase("General Municipal Department"))
                 .or(() -> departmentRepository.findAll().stream().findFirst())
                 .orElseGet(() -> departmentRepository.save(new Department("General Municipal Department", "GEN", "General municipal affairs", "0141-2740000")));
-    }
-
-    private long resolveNextSequence(String prefix) {
-        Optional<String> latestCode = complaintRepository.findTopComplaintCodeByPrefix(prefix);
-        if (latestCode.isEmpty()) return 1L;
-        try {
-            String code = latestCode.get();
-            int lastDash = code.lastIndexOf('-');
-            if (lastDash >= 0 && lastDash < code.length() - 1) {
-                return Long.parseLong(code.substring(lastDash + 1)) + 1L;
-            }
-        } catch (NumberFormatException e) {
-            // fallback
-        }
-        return 1L;
     }
 
     @Transactional(readOnly = true)

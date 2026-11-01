@@ -632,6 +632,59 @@ public class CivicConnectIntegrationTest {
         assertFalse(notificationRepository.findByUserIdOrderByCreatedAtDesc(citizenUser.getId()).isEmpty(), "Citizen must receive notification");
     }
 
+    @Test
+    void testConcurrentComplaintCreationUniqueCodesNo500() throws Exception {
+        if (departmentRepository != null && departmentRepository.findByNameIgnoreCase("Water Supply and Sewerage Board").isEmpty()) {
+            departmentRepository.save(new Department("Water Supply and Sewerage Board", "WAT", "Water Supply and Drainage", "0141-2222222"));
+        }
+        String citizenEmail = "concurrent_citizen_" + System.currentTimeMillis() + "@civic.local";
+        createCitizenUser(citizenEmail, "Citizen@123");
+        String token = obtainToken(citizenEmail, "Citizen@123", "citizen");
+
+        int threadCount = 30;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(10);
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<java.util.concurrent.Future<MvcResult>> futures = new java.util.ArrayList<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            final int index = i;
+            futures.add(executor.submit(() -> {
+                latch.await();
+                Map<String, Object> req = Map.of(
+                        "title", "Parallel Issue " + index,
+                        "description", "Concurrency test burst submission " + index,
+                        "category", "Water",
+                        "district", "Jaipur",
+                        "ulbName", "Nagar Nigam Jaipur"
+                );
+                return mockMvc.perform(post("/api/complaints")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                        .andReturn();
+            }));
+        }
+
+        latch.countDown();
+        executor.shutdown();
+        assertTrue(executor.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS));
+
+        java.util.Set<String> uniqueCodes = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+        for (java.util.concurrent.Future<MvcResult> f : futures) {
+            MvcResult res = f.get();
+            int statusCode = res.getResponse().getStatus();
+            assertNotEquals(500, statusCode, "Concurrent complaint submission must never produce 500 server error: " + res.getResponse().getContentAsString());
+            assertEquals(201, statusCode, "Expected 201 Created for concurrent submission: " + res.getResponse().getContentAsString());
+            JsonNode json = objectMapper.readTree(res.getResponse().getContentAsString());
+            String code = json.has("complaintId") ? json.get("complaintId").asText() : json.path("data").get("complaintId").asText();
+            assertNotNull(code);
+            assertFalse(code.startsWith("TMP-"), "Complaint code must not be temporary placeholder");
+            uniqueCodes.add(code);
+        }
+
+        assertEquals(threadCount, uniqueCodes.size(), "All " + threadCount + " generated complaint codes must be unique");
+    }
+
     private String obtainToken(String email, String password, String portal) throws Exception {
         LoginRequest req = new LoginRequest(email, password, portal != null ? portal : "citizen");
         MvcResult res = mockMvc.perform(post("/api/auth/login")
