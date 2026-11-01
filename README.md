@@ -204,6 +204,7 @@ For the full specification of HTTP methods, routes, request/response JSON schema
 
 ## Known Limitations
 
+- No login lockout or rate limiting on authentication endpoints.
 - Mobile responsive design is desktop-first; mobile view uses standard responsive collapse.
 - Email and SMS notifications are simulated via database table `notifications`.
 - Geocoding and reverse geocoding rely on browser GPS and client-side coordinate accuracy.
