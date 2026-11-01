@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,10 +36,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .findFirst()
-                .map(FieldError::getDefaultMessage)
-                .orElse("Validation failed");
+        String message = "Validation failed";
+        List<FieldError> errors = ex.getBindingResult().getFieldErrors();
+        if (!errors.isEmpty() && errors.get(0).getDefaultMessage() != null) {
+            message = errors.get(0).getDefaultMessage();
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(buildErrorBody(message));
     }
 
