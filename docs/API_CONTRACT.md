@@ -20,6 +20,9 @@
   - `GET/POST/DELETE /api/complaints/draft`: Citizen draft management
   - `POST/PUT/DELETE /api/departments/**`: Admin department management
   - `GET /api/departments/my/stats`: Officer department stats
+  - `POST /api/feedback`: Citizen rating (1 to 5) and comments
+  - `GET /api/feedback/{complaintId}`: Retrieve feedback for ticket
+  - `GET/PUT/POST /api/notifications/**`: Notifications management
   - `GET/POST/PUT /api/admin/officers/**`: Admin officer management
   - `GET /api/admin/users`: Admin user list
   - `GET /api/admin/stats`: Admin system stats
@@ -27,7 +30,7 @@
 ---
 
 ## 2. Common Error Response Shape
-HTTP Statuses: `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `500 Internal Server Error`
+HTTP Statuses: `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `413 Payload Too Large`, `500 Internal Server Error`
 ```json
 {
   "success": false,
@@ -63,6 +66,11 @@ HTTP Statuses: `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not 
 | `PUT` | `/api/departments/{id}/toggle-active` | Admin | Toggle active status. Returns 200. |
 | `DELETE` | `/api/departments/{id}` | Admin | Delete department. Returns 409 Conflict if complaints or officers exist in department. Returns 200 if empty. |
 | `GET` | `/api/departments/my/stats` | Officer | Department dashboard stats: `{ "departmentId": 1, "departmentName": "...", "total": 12, "submitted": 2, "inProgress": 5, "resolved": 5, "slaBreaches": 0 }` |
+| `POST` | `/api/feedback` | Citizen | Record citizen satisfaction rating (1 to 5) and optional comment on resolved complaints. Returns 200. |
+| `GET` | `/api/feedback/{complaintId}` | Citizen, Officer, Admin | Retrieve feedback entries for a specific complaint. Returns 200 list. |
+| `GET` | `/api/notifications` | Logged in | Get notifications for authenticated user. Returns 200 list. |
+| `PUT` | `/api/notifications/{id}/read` | Logged in | Mark single notification as read. Returns 200. |
+| `POST` | `/api/notifications` | Logged in | Create user notification. Returns 200. |
 | `GET` | `/api/admin/officers` | Admin | List department officers with assigned department name: `[ { "id": 2, "name": "...", "email": "...", "departmentId": 1, "departmentName": "..." } ]` |
 | `POST` | `/api/admin/officers` | Admin | Create department officer with initial password and department ID. Returns 201. |
 | `PUT` | `/api/admin/officers/{id}` | Admin | Update officer name, phone, department, or optional password. Returns 200. |
