@@ -9,10 +9,10 @@ echo ========================================================
 set "PROJECT_ROOT=%~dp0"
 
 echo Starting Spring Boot Backend in window 'civic-backend'...
-start "civic-backend" cmd /k "cd /d "%PROJECT_ROOT%backend" && call mvnw.cmd spring-boot:run"
+start "civic-backend" /d "%PROJECT_ROOT%backend" cmd /k "mvnw.cmd spring-boot:run"
 
 echo Starting Vite Frontend in window 'civic-frontend'...
-start "civic-frontend" cmd /k "cd /d "%PROJECT_ROOT%frontend" && npm run dev"
+start "civic-frontend" /d "%PROJECT_ROOT%frontend" cmd /k "npm run dev"
 
 echo Both processes launched.
 echo Frontend URL: http://localhost:5173

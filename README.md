@@ -63,8 +63,8 @@ Execute these 5 SQL commands in MySQL (e.g. via MySQL Command Line Client or Wor
 ```sql
 CREATE DATABASE IF NOT EXISTS civic_connect CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS civic_connect_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'civic_app'@'127.0.0.1' IDENTIFIED BY 'CA254mxYNFjspWQpC25asj7Z';
-CREATE USER IF NOT EXISTS 'civic_app'@'localhost' IDENTIFIED BY 'CA254mxYNFjspWQpC25asj7Z';
+CREATE USER IF NOT EXISTS 'civic_app'@'127.0.0.1' IDENTIFIED BY '<your_secure_password>';
+CREATE USER IF NOT EXISTS 'civic_app'@'localhost' IDENTIFIED BY '<your_secure_password>';
 GRANT ALL PRIVILEGES ON civic_connect.* TO 'civic_app'@'127.0.0.1', 'civic_app'@'localhost';
 GRANT ALL PRIVILEGES ON civic_connect_test.* TO 'civic_app'@'127.0.0.1', 'civic_app'@'localhost';
 FLUSH PRIVILEGES;
@@ -81,8 +81,8 @@ FLUSH PRIVILEGES;
    MYSQL_PORT=3306
    spring.datasource.url=jdbc:mysql://127.0.0.1:3306/civic_connect?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
    spring.datasource.username=civic_app
-   spring.datasource.password=CA254mxYNFjspWQpC25asj7Z
-   app.jwt.secret=aa35c6cdabf9fe2f1fc071fc4f50c951754a4c44f572904959262ebb8e9ae703
+   spring.datasource.password=<your_database_password>
+   app.jwt.secret=<your_jwt_secret_minimum_32_characters>
    app.seed-demo-users=true
    ```
 
