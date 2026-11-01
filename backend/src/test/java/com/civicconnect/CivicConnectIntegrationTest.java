@@ -696,6 +696,19 @@ public class CivicConnectIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    @Test
+    void testReopenComplaintEndpointReturns404NotFound() throws Exception {
+        String citizenEmail = "citizen_reopen_" + System.currentTimeMillis() + "@civic.local";
+        createCitizenUser(citizenEmail, "Citizen@123");
+        String token = obtainToken(citizenEmail, "Citizen@123", "citizen");
+
+        mockMvc.perform(put("/api/complaints/1/reopen")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"test\"}"))
+                .andExpect(status().isNotFound());
+    }
+
     private String obtainToken(String email, String password, String portal) throws Exception {
         LoginRequest req = new LoginRequest(email, password, portal != null ? portal : "citizen");
         MvcResult res = mockMvc.perform(post("/api/auth/login")

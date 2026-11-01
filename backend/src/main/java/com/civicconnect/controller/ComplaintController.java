@@ -6,7 +6,6 @@ import com.civicconnect.dto.UpdateStatusRequest;
 import com.civicconnect.entity.User;
 import com.civicconnect.service.ComplaintDraftService;
 import com.civicconnect.service.ComplaintService;
-import com.civicconnect.service.ComplaintWorkflowService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,16 +24,13 @@ import java.util.Map;
 public class ComplaintController {
 
     private final ComplaintService complaintService;
-    private final ComplaintWorkflowService workflowService;
     private final ComplaintDraftService draftService;
 
     public ComplaintController(
             ComplaintService complaintService,
-            ComplaintWorkflowService workflowService,
             ComplaintDraftService draftService
     ) {
         this.complaintService = complaintService;
-        this.workflowService = workflowService;
         this.draftService = draftService;
     }
 
@@ -116,14 +112,5 @@ public class ComplaintController {
         }
         Long newDepartmentId = Long.parseLong(deptIdVal.toString());
         return ResponseEntity.ok(complaintService.reassignDepartment(idOrCode, newDepartmentId, admin));
-    }
-
-    @PutMapping("/{idOrCode}/reopen")
-    public ResponseEntity<Map<String, Object>> reopenComplaint(
-            @PathVariable String idOrCode,
-            @RequestBody Map<String, Object> body,
-            @AuthenticationPrincipal User caller
-    ) {
-        return ResponseEntity.ok(workflowService.reopenComplaint(idOrCode, body, caller));
     }
 }
