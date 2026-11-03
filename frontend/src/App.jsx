@@ -2,7 +2,6 @@ import React, { useState, useRef, Suspense, lazy } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import QuickAccess from './components/QuickAccess';
-import CivicProblems from './components/CivicProblems';
 import Features from './components/Features';
 import Categories from './components/Categories';
 import RolePortals from './components/RolePortals';
@@ -132,7 +131,6 @@ function App() {
             <div className="animate-fade-in">
               <Hero setActivePage={setActivePage} />
               <QuickAccess setActivePage={setActivePage} />
-              <CivicProblems />
               <Features />
               <Categories setActivePage={setActivePage} />
               <RolePortals setActivePage={setActivePage} />
@@ -143,7 +141,6 @@ function App() {
           {activePage === 'Complaint' && (
             <div className="animate-fade-in" style={{ paddingTop: '100px' }}>
               <ComplaintCenter setActivePage={setActivePage} authenticatedUser={authenticatedUser} />
-              <CivicWorkflow showOnlySlaAndEscalation={false} />
             </div>
           )}
 

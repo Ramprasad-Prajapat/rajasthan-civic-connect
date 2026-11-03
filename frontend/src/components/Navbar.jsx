@@ -160,16 +160,7 @@ export default function Navbar({
                       setActivePage('Login/Register');
                     }}
                   >
-                    Sign In
-                  </button>
-                  <button
-                    className="btn btn-primary btn-sm rounded-pill px-3 fw-semibold shadow-sm"
-                    onClick={() => {
-                      if (setAuthViewMode) setAuthViewMode('register');
-                      setActivePage('Login/Register');
-                    }}
-                  >
-                    Register
+                    Login
                   </button>
                 </div>
               )}
@@ -234,24 +225,14 @@ export default function Navbar({
             ) : (
               <div className="d-flex gap-2 border-top pt-2">
                 <button
-                  className="btn btn-outline-primary btn-sm rounded-pill w-50"
+                  className="btn btn-outline-primary btn-sm rounded-pill w-100"
                   onClick={() => {
                     if (setAuthViewMode) setAuthViewMode('login');
                     setActivePage('Login/Register');
                     setMobileMenuOpen(false);
                   }}
                 >
-                  Sign In
-                </button>
-                <button
-                  className="btn btn-primary btn-sm rounded-pill w-50"
-                  onClick={() => {
-                    if (setAuthViewMode) setAuthViewMode('register');
-                    setActivePage('Login/Register');
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  Register
+                  Login
                 </button>
               </div>
             )}

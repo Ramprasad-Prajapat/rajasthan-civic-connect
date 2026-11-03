@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Logo from './Logo';
 import { loginUser, registerUser } from '../apiService';
 
@@ -15,11 +15,14 @@ export default function LoginRegister({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    setIsRegister(authViewMode === 'register');
+  }, [authViewMode]);
 
   const switchMode = (toRegister) => {
     setIsRegister(toRegister);
@@ -58,10 +61,6 @@ export default function LoginRegister({
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match');
-      return;
-    }
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -191,18 +190,18 @@ export default function LoginRegister({
                       Signing in...
                     </span>
                   ) : (
-                    'Sign In'
+                    'Login'
                   )}
                 </button>
 
                 <div className="text-center">
-                  <span className="text-muted small">Don't have an account? </span>
+                  <span className="text-muted small">New user? </span>
                   <button
                     type="button"
                     className="btn btn-link p-0 small fw-bold text-primary text-decoration-none"
                     onClick={() => switchMode(true)}
                   >
-                    Register as Citizen
+                    Register
                   </button>
                 </div>
               </form>
@@ -244,7 +243,7 @@ export default function LoginRegister({
                   />
                 </div>
 
-                <div className="mb-3">
+                <div className="mb-4">
                   <label className="form-label small fw-bold text-secondary mb-1">Password *</label>
                   <input
                     type="password"
@@ -252,19 +251,6 @@ export default function LoginRegister({
                     placeholder="Minimum 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label className="form-label small fw-bold text-secondary mb-1">Confirm Password *</label>
-                  <input
-                    type="password"
-                    className="form-control bg-light border-0 py-2 small"
-                    placeholder="Repeat password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     minLength={6}
                   />
@@ -292,7 +278,7 @@ export default function LoginRegister({
                     className="btn btn-link p-0 small fw-bold text-primary text-decoration-none"
                     onClick={() => switchMode(false)}
                   >
-                    Back to Sign In
+                    Login
                   </button>
                 </div>
               </form>
