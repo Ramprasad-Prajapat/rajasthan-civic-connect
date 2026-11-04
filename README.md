@@ -1,4 +1,4 @@
-# Rajasthan Civic Connect
+﻿# Rajasthan Civic Connect
 
 Rajasthan Civic Connect is a unified citizen grievance redressal and municipal governance platform built for Rajasthan state civic administration. It empowers citizens to lodge and track civic complaints with geo-tagging, photos, and auto-department routing, while enabling department officers to manage grievances within their scoped department and administrators to manage departments, officers, users, and state-wide grievance resolution.
 
@@ -18,31 +18,31 @@ Rajasthan Civic Connect is a unified citizen grievance redressal and municipal g
 
 ```text
 rajasthan-civic-connect/
-├── README.md                           # Project documentation and setup guide
-├── run-project.bat                     # Starts backend and frontend development servers
-├── stop-project.bat                    # Stops backend and frontend development servers
-├── test-all.bat                        # Runs backend Maven tests and frontend production build
-├── .gitignore                          # Git ignore definitions
-├── backend/                            # Spring Boot backend
-│   ├── mvnw                            # Maven Wrapper (Unix)
-│   ├── mvnw.cmd                        # Maven Wrapper (Windows)
-│   ├── .mvn/wrapper/                   # Maven Wrapper configuration
-│   ├── pom.xml                         # Maven project dependencies
-│   ├── application-local.properties    # Local configuration & credentials (git-ignored)
-│   ├── application-local.properties.example # Local configuration template
-│   └── src/                            # Java 21 source code & tests
-├── frontend/                           # React frontend
-│   ├── package.json                    # Frontend dependencies & npm scripts (dev, build, preview)
-│   ├── vite.config.js                  # Vite configuration
-│   ├── index.html                      # Entry HTML document
-│   ├── .env.example                    # Frontend environment variables template
-│   ├── .env.local                      # Local frontend environment variables (git-ignored)
-│   ├── public/                         # Static image assets
-│   └── src/                            # React JSX components, plain CSS, apiService.js
-├── database/                           # Database definitions
-│   └── schema.sql                      # MySQL database schema (8 tables)
-└── docs/                               # Project documentation
-    └── API_CONTRACT.md                 # REST API specification & status codes
+â”œâ”€â”€ README.md                           # Project documentation and setup guide
+â”œâ”€â”€ run-project.bat                     # Starts backend and frontend development servers
+â”œâ”€â”€ stop-project.bat                    # Stops backend and frontend development servers
+â”œâ”€â”€ test-all.bat                        # Runs backend Maven tests and frontend production build
+â”œâ”€â”€ .gitignore                          # Git ignore definitions
+â”œâ”€â”€ backend/                            # Spring Boot backend
+â”‚   â”œâ”€â”€ mvnw                            # Maven Wrapper (Unix)
+â”‚   â”œâ”€â”€ mvnw.cmd                        # Maven Wrapper (Windows)
+â”‚   â”œâ”€â”€ .mvn/wrapper/                   # Maven Wrapper configuration
+â”‚   â”œâ”€â”€ pom.xml                         # Maven project dependencies
+â”‚   â”œâ”€â”€ application-local.properties    # Local configuration & credentials (git-ignored)
+â”‚   â”œâ”€â”€ application-local.properties.example # Local configuration template
+â”‚   â””â”€â”€ src/                            # Java 21 source code & tests
+â”œâ”€â”€ frontend/                           # React frontend
+â”‚   â”œâ”€â”€ package.json                    # Frontend dependencies & npm scripts (dev, build, preview)
+â”‚   â”œâ”€â”€ vite.config.js                  # Vite configuration
+â”‚   â”œâ”€â”€ index.html                      # Entry HTML document
+â”‚   â”œâ”€â”€ .env.example                    # Frontend environment variables template
+â”‚   â”œâ”€â”€ .env.local                      # Local frontend environment variables (git-ignored)
+â”‚   â”œâ”€â”€ public/                         # Static image assets
+â”‚   â””â”€â”€ src/                            # React JSX components, plain CSS, apiService.js
+â”œâ”€â”€ database/                           # Database definitions
+â”‚   â””â”€â”€ schema.sql                      # MySQL database schema (8 tables)
+â””â”€â”€ docs/                               # Project documentation
+    â””â”€â”€ API_CONTRACT.md                 # REST API specification & status codes
 ```
 
 ---
@@ -208,3 +208,32 @@ For the full specification of HTTP methods, routes, request/response JSON schema
 - Mobile responsive design is desktop-first; mobile view uses standard responsive collapse.
 - Email and SMS notifications are simulated via database table `notifications`.
 - Geocoding and reverse geocoding rely on browser GPS and client-side coordinate accuracy.
+
+
+---
+
+## Deployment (Production Architecture)
+
+### Architecture
+- **Frontend:** Vercel (Static Hosting / Single Page Application)
+- **Backend:** Render (Docker Web Service / Java 21 Spring Boot)
+- **Database:** Aiven (Managed MySQL Free Tier)
+
+### Environment Variables
+- **Vercel (Frontend):**
+  - VITE_API_BASE_URL (Points to Render backend, e.g. https://<render-service>.onrender.com/api)
+- **Render (Backend):**
+  - PORT (Provided by Render, routed to server.port)
+  - SPRING_DATASOURCE_URL (JDBC URL: jdbc:mysql://<AIVEN_HOST>:<AIVEN_PORT>/civic_connect?sslMode=REQUIRED&serverTimezone=UTC)
+  - SPRING_DATASOURCE_USERNAME (Aiven database user)
+  - SPRING_DATASOURCE_PASSWORD (Aiven database password)
+  - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE (Recommended 5 for free tier)
+  - SPRING_JPA_HIBERNATE_DDL_AUTO (update)
+  - APP_JWT_SECRET (Minimum 32-character / 64-hex random cryptographic secret)
+  - APP_CORS_ALLOWED_ORIGINS (Exact Vercel production URL, e.g. https://<app>.vercel.app)
+  - APP_SEED_DEMO_USERS (	rue on initial setup to seed demo accounts)
+
+### Free Tier & Operational Notes
+- **Render Cold Start:** Free instances sleep after 15 minutes of inactivity. The first request after sleep takes 30–60 seconds while the container initializes.
+- **Aiven Inactivity Power-Off:** Free MySQL instances may enter POWEROFF state when idle. Power on from the Aiven console or API before traffic.
+- **Demo Accounts Warning:** Public demo credentials are intended solely for evaluation and development. Never enter real personal identifying information or production secrets.
