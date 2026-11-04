@@ -3,14 +3,25 @@ node_modules/
 **/node_modules/
 
 # Build outputs
-dist/
-**/dist/
 target/
 **/target/
+dist/
+**/dist/
+build/
+**/build/
 
-# Local runtime & agent state
-.agent/
-**/.agent/
+# Logs
+*.log
+**/*.log
+logs/
+**/logs/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
 
 # Environment and secrets
 .env
@@ -19,27 +30,35 @@ target/
 !frontend/.env.example
 backend/application-local.properties
 **/application-local.properties
+*.pem
+*.key
+civic-deploy-secrets.json
 
-# Logs
-*.log
-**/*.log
-
-# IDE files
-.idea/
-.vscode/
-*.iml
-
-# Archives
+# Temporary, generated and tool files
+*.tmp
+*.bak
+*.old
+*.orig
+*~
+.agent/
+**/.agent/
+.vercel/
+**/.vercel/
+civic-qa-*/
 *.zip
-*.tar.gz
+*.jar
+!.mvn/wrapper/*.jar
 
 # Database SQL dumps (except schema.sql)
 *.sql
 !database/schema.sql
 
-# Agent instruction files
+# AI tools and instruction files
+.claude/
+.cursor/
+.gemini/
+.windsurf/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 AGENT_*.md
-
-# OS metadata
-.DS_Store
-Thumbs.db
