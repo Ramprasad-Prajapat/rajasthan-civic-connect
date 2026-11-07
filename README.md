@@ -1,239 +1,244 @@
-﻿# Rajasthan Civic Connect
+# Rajasthan Civic Connect
 
-Rajasthan Civic Connect is a unified citizen grievance redressal and municipal governance platform built for Rajasthan state civic administration. It empowers citizens to lodge and track civic complaints with geo-tagging, photos, and auto-department routing, while enabling department officers to manage grievances within their scoped department and administrators to manage departments, officers, users, and state-wide grievance resolution.
+[![Live Application](https://img.shields.io/badge/Vercel-Frontend%20Live-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://rajasthan-civic-connect.vercel.app)
+[![Backend API](https://img.shields.io/badge/Render-Backend%20Live-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://civic-connect-api-bw8t.onrender.com/api/health)
+[![Database](https://img.shields.io/badge/Aiven-MySQL%20Managed-FF3554?style=for-the-badge&logo=mysql&logoColor=white)](https://aiven.io)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 
----
-
-## Tech Stack
-
-- **Backend:** Java 21, Spring Boot 3.5, Spring Security, Spring Data JPA, Hibernate, JWT (HS256)
-- **Frontend:** React 19, Vite (React build tool), plain CSS, browser `fetch`
-- **Database:** MySQL 8.0+ (`civic_connect`, port `3306`, `utf8mb4_unicode_ci`)
-- **Build & Package:** Apache Maven 3.9+ / Maven Wrapper (`mvnw`, `mvnw.cmd`) & npm
-- **Presentation Libraries:** Bootstrap 5, Bootstrap Icons, Leaflet Maps
+Rajasthan Civic Connect is a production-grade, state-level citizen grievance redressal and municipal governance platform built for Rajasthan Urban Local Bodies (ULBs). It provides seamless, transparent complaint lifecycle tracking from citizen submission to department officer verification and resolution.
 
 ---
 
-## Folder Tree
+## Live Production Deployments
+
+- **Frontend Application (Vercel):** [https://rajasthan-civic-connect.vercel.app](https://rajasthan-civic-connect.vercel.app)
+- **REST API Backend (Render):** [https://civic-connect-api-bw8t.onrender.com](https://civic-connect-api-bw8t.onrender.com)
+- **Health Check Status:** [https://civic-connect-api-bw8t.onrender.com/api/health](https://civic-connect-api-bw8t.onrender.com/api/health)
+- **Managed Database:** Aiven Cloud MySQL 8.4 (SSL Enforced, TLS 1.3)
+
+---
+
+## Visual Preview
+
+| Desktop Experience (1366 × 768) | Mobile Viewport (390 × 844) |
+|:---:|:---:|
+| ![Desktop View](docs/screenshots/desktop_home.png) | ![Mobile View](docs/screenshots/mobile_home.png) |
+
+---
+
+## Key Features
+
+1. **Citizen Grievance Redressal:**
+   - Lodge complaints with category, district, ULB, ward number, GPS geolocation, and photo evidence.
+   - Automated category-to-department routing (Water, Sanitation, Public Works, Electricity, General).
+   - In-progress draft autosave with persistent storage in MySQL.
+   - Chronological ticket timeline tracking with real-time status transitions.
+   - Post-resolution satisfaction ratings and feedback submission.
+
+2. **Department Officer Workflow:**
+   - Role-based department scoping (`users.department_id`); officers only see tickets belonging to their assigned department.
+   - Department metrics dashboard: Total, Submitted, In Progress, Resolved, and Overdue SLA.
+   - Status transitions (`InProgress`, `Resolved`, `Closed`) with official remarks and timeline audits.
+
+3. **Administrator Governance Portal:**
+   - State-wide aggregate performance metrics across all Rajasthan districts and ULBs.
+   - Officer enrollment and department reassignment.
+   - Full user directory management and municipal department administration.
+
+4. **Automated SLA Timers:**
+   - Dynamic SLA calculation based on grievance priority (Normal: 48h, High: 24h, Critical: 6h, Emergency: 2h).
+   - Real-time SLA breach detection and escalation indicators.
+
+---
+
+## Architecture Overview
 
 ```text
-rajasthan-civic-connect/
-â”œâ”€â”€ README.md                           # Project documentation and setup guide
-â”œâ”€â”€ run-project.bat                     # Starts backend and frontend development servers
-â”œâ”€â”€ stop-project.bat                    # Stops backend and frontend development servers
-â”œâ”€â”€ test-all.bat                        # Runs backend Maven tests and frontend production build
-â”œâ”€â”€ .gitignore                          # Git ignore definitions
-â”œâ”€â”€ backend/                            # Spring Boot backend
-â”‚   â”œâ”€â”€ mvnw                            # Maven Wrapper (Unix)
-â”‚   â”œâ”€â”€ mvnw.cmd                        # Maven Wrapper (Windows)
-â”‚   â”œâ”€â”€ .mvn/wrapper/                   # Maven Wrapper configuration
-â”‚   â”œâ”€â”€ pom.xml                         # Maven project dependencies
-â”‚   â”œâ”€â”€ application-local.properties    # Local configuration & credentials (git-ignored)
-â”‚   â”œâ”€â”€ application-local.properties.example # Local configuration template
-â”‚   â””â”€â”€ src/                            # Java 21 source code & tests
-â”œâ”€â”€ frontend/                           # React frontend
-â”‚   â”œâ”€â”€ package.json                    # Frontend dependencies & npm scripts (dev, build, preview)
-â”‚   â”œâ”€â”€ vite.config.js                  # Vite configuration
-â”‚   â”œâ”€â”€ index.html                      # Entry HTML document
-â”‚   â”œâ”€â”€ .env.example                    # Frontend environment variables template
-â”‚   â”œâ”€â”€ .env.local                      # Local frontend environment variables (git-ignored)
-â”‚   â”œâ”€â”€ public/                         # Static image assets
-â”‚   â””â”€â”€ src/                            # React JSX components, plain CSS, apiService.js
-â”œâ”€â”€ database/                           # Database definitions
-â”‚   â””â”€â”€ schema.sql                      # MySQL database schema (8 tables)
-â””â”€â”€ docs/                               # Project documentation
-    â””â”€â”€ API_CONTRACT.md                 # REST API specification & status codes
+┌────────────────────────────────────────────────────────┐
+│                   Vercel CDN Edge                      │
+│        React 19 + Vite 8 SPA (Client-Side State)       │
+│        https://rajasthan-civic-connect.vercel.app      │
+└───────────────────────────┬────────────────────────────┘
+                            │ HTTPS / REST (JWT Bearer)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   Render Web Service                   │
+│        Spring Boot 3.5.11 / Java 21 (Eclipse Temurin)  │
+│        Stateless Spring Security + Hibernate JPA       │
+│        https://civic-connect-api-bw8t.onrender.com     │
+└───────────────────────────┬────────────────────────────┘
+                            │ SSL Mode: REQUIRED (TLS 1.3)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   Aiven Cloud MySQL                    │
+│        MySQL 8.4 Server (Managed Free-Tier Cluster)    │
+│        Database: civic_connect (utf8mb4_unicode_ci)    │
+└────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Requirements
+## Technology Stack
 
-- **Java Development Kit (JDK):** JDK 21+ (OpenJDK or Oracle JDK)
-- **Node.js & npm:** Node.js v18.0.0 or later with npm (for frontend React dev server & build)
-- **Database Server:** MySQL Server 8.0+ running on `127.0.0.1:3306`
-- **Build Tool:** Maven 3.9+ or the included Maven Wrapper (`backend/mvnw.cmd` on Windows)
+### Backend
+- **Language & Runtime:** Java 21 (Eclipse Temurin OpenJDK)
+- **Framework:** Spring Boot 3.5.11
+- **Security:** Spring Security (Stateless JWT token handling, BCrypt password hashing)
+- **Database Access:** Spring Data JPA / Hibernate ORM
+- **Database Driver:** MySQL Connector/J (`com.mysql:mysql-connector-j`)
+- **Containerization:** Multi-stage Docker image with JVM memory tuning (`-XX:MaxRAMPercentage=65 -XX:+UseSerialGC`)
+- **Build Tool:** Apache Maven 3.9 / Maven Wrapper (`mvnw`, `mvnw.cmd`)
+
+### Frontend
+- **Framework:** React 19 (`react`, `react-dom`)
+- **Bundler & Tooling:** Vite 8 (`@vitejs/plugin-react`)
+- **Styling:** Bootstrap 5, Bootstrap Icons, custom responsive CSS
+- **Maps:** Leaflet 1.9, React-Leaflet 5
+- **HTTP Client:** Native browser `fetch` with centralized `src/apiService.js`
+- **Session:** JWT token persistence in `localStorage`
+
+### Cloud Infrastructure
+- **Frontend Hosting:** Vercel (Edge Network)
+- **Backend Hosting:** Render (Docker Web Service)
+- **Database Hosting:** Aiven (Managed MySQL Service)
 
 ---
 
-## Database Setup
+## Repository Structure
 
-Execute these 5 SQL commands in MySQL (e.g. via MySQL Command Line Client or Workbench) to set up databases and user permissions:
+```text
+rajasthan-civic-connect/
+├── README.md                           # Main repository documentation & guide
+├── run-project.bat                     # Starts backend & frontend local development servers
+├── stop-project.bat                    # Gracefully terminates local server processes
+├── test-all.bat                        # Runs Maven integration tests & Vite production build
+├── .gitignore                          # Git ignore definitions
+├── backend/                            # Spring Boot 3.5 / Java 21 application
+│   ├── README.md                       # Backend-specific architecture & setup
+│   ├── pom.xml                         # Maven dependencies & build configuration
+│   ├── Dockerfile                      # Production multi-stage Docker build
+│   ├── mvnw / mvnw.cmd                 # Maven wrapper scripts
+│   ├── .mvn/wrapper/                   # Maven wrapper binaries and configuration
+│   ├── application-local.properties.example # Local configuration template
+│   └── src/                            # Java source code and tests
+├── frontend/                           # React 19 / Vite single-page application
+│   ├── README.md                       # Frontend-specific architecture & setup
+│   ├── package.json                    # Dependencies & npm scripts
+│   ├── vite.config.js                  # Vite bundler configuration
+│   ├── index.html                      # Entry HTML document
+│   ├── .env.example                    # Environment variables template
+│   ├── public/                         # Static assets and GeoJSON/ULB datasets
+│   └── src/                            # React JSX components, plain CSS, apiService.js
+├── database/                           # Database schema definitions
+│   └── schema.sql                      # Complete MySQL database schema (8 entity tables)
+└── docs/                               # Comprehensive project documentation
+    ├── API_CONTRACT.md                 # Full REST API routes, schemas, and error codes
+    ├── DEPLOYMENT.md                   # Cloud production deployment & environment guide
+    └── screenshots/                    # Desktop and mobile application preview images
+```
+
+---
+
+## Local Installation & Quickstart
+
+### Prerequisites
+- **Java:** JDK 21+ (`java -version`)
+- **Node.js:** v18.0.0 or later (`node -v`)
+- **MySQL:** MySQL Server 8.0+ running on `127.0.0.1:3306`
+
+### 1. Database Setup
+Execute the following commands in your MySQL client to create the database and user:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS civic_connect CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS civic_connect_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'civic_app'@'127.0.0.1' IDENTIFIED BY '<your_secure_password>';
-CREATE USER IF NOT EXISTS 'civic_app'@'localhost' IDENTIFIED BY '<your_secure_password>';
+CREATE USER IF NOT EXISTS 'civic_app'@'127.0.0.1' IDENTIFIED BY 'civic_dev_password';
+CREATE USER IF NOT EXISTS 'civic_app'@'localhost' IDENTIFIED BY 'civic_dev_password';
 GRANT ALL PRIVILEGES ON civic_connect.* TO 'civic_app'@'127.0.0.1', 'civic_app'@'localhost';
 GRANT ALL PRIVILEGES ON civic_connect_test.* TO 'civic_app'@'127.0.0.1', 'civic_app'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
----
+### 2. Backend Configuration
+Copy `backend/application-local.properties.example` to `backend/application-local.properties`:
 
-## Configuration
+```properties
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/civic_connect?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+spring.datasource.username=civic_app
+spring.datasource.password=civic_dev_password
+app.jwt.secret=<your_secure_256_bit_jwt_secret_key_here>
+app.seed-demo-users=true
+```
 
-1. **Backend:**
-   Copy `backend/application-local.properties.example` to `backend/application-local.properties`:
-   ```properties
-   MYSQL_HOST=127.0.0.1
-   MYSQL_PORT=3306
-   spring.datasource.url=jdbc:mysql://127.0.0.1:3306/civic_connect?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-   spring.datasource.username=civic_app
-   spring.datasource.password=<your_database_password>
-   app.jwt.secret=<your_jwt_secret_minimum_32_characters>
-   app.seed-demo-users=true
-   ```
+### 3. Frontend Configuration
+Copy `frontend/.env.example` to `frontend/.env.local`:
 
-2. **Frontend:**
-   Copy `frontend/.env.example` to `frontend/.env.local`:
-   ```properties
-   VITE_API_BASE_URL=http://localhost:8080/api
-   ```
+```properties
+VITE_API_BASE_URL=http://localhost:8080/api
+```
 
----
-
-## Running the Application
-
-To start both the Spring Boot backend and Vite React frontend in separate windows:
+### 4. Running Locally
+Run both servers automatically:
 ```bat
 run-project.bat
 ```
-- **Backend Health:** `http://localhost:8080/api/health`
-- **Frontend UI:** `http://localhost:5173`
+Or start them individually:
+```powershell
+# Terminal 1 - Backend
+cd backend
+.\mvnw.cmd spring-boot:run
 
-To stop all running application server windows:
+# Terminal 2 - Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+- **Frontend Web UI:** `http://localhost:5173`
+- **Backend API:** `http://localhost:8080/api`
+- **Health Check:** `http://localhost:8080/api/health`
+
+To stop local servers:
 ```bat
 stop-project.bat
 ```
 
----
-
-## Testing
-
-To run the complete automated test suite (backend JUnit tests via Maven Wrapper and frontend production build via Vite):
+### 5. Running Automated Tests
 ```bat
 test-all.bat
 ```
+*(Runs backend JUnit integration tests and frontend Vite production bundling).*
 
 ---
 
-## Roles and Permissions
+## Demo Accounts (Development & Evaluation)
 
-- **Citizen (`ROLE_CITIZEN`):**
-  - Lodge grievances with title, description, category, district, ULB, GPS coordinates, and photo proof.
-  - Automatic category-to-department routing (e.g. Water, Sanitation, Road, Drainage).
-  - Draft autosave to MySQL (`complaint_drafts`), restored across logins.
-  - View own complaints (`/api/complaints/my`), track chronological timeline, and submit satisfaction feedback.
-  - Update profile details and change password.
+When `app.seed-demo-users=true` is enabled, the platform seeds standard demo credentials:
 
-- **Department Officer (`ROLE_OFFICER`):**
-  - Scoped strictly to assigned department (`users.department_id`).
-  - View complaints assigned to own department only. Attempts to view or update other departments return `403 Forbidden`.
-  - View real-time department metrics: Total, Submitted, In Progress, Resolved, and Overdue SLA.
-  - Update grievance status (`InProgress`, `Resolved`, `Closed`) with official remarks, updating citizen timeline and notifications.
-
-- **Administrator (`ROLE_ADMIN`):**
-  - View state-wide aggregate metrics across all departments and districts.
-  - Department management: Create, update, toggle active status, and delete (protected by 409 Conflict if complaints or officers exist).
-  - Officer management: Enroll department officers with initial credentials and department assignments; toggle active/disabled status.
-  - Complaints governance: Search all complaints, reassign grievances between departments with timeline logging, and update statuses.
-  - User directory: View all registered citizens and officers.
-
----
-
-## Demo Logins (Development Only)
-
-When `app.seed-demo-users=true` is enabled in `application-local.properties`, the following accounts are available:
-
-| Role | Email | Password | Scope / Permissions |
+| Role | Username / Email | Password | Assigned Scope / Permissions |
 |---|---|---|---|
-| **Citizen** | `citizen@civic.local` | `Citizen@123` | Citizen Portal: Lodge complaints, draft sync, track tickets |
-| **Department Officer (Water)** | `officer@civic.local` | `Officer@123` | Scoped to Water Department tickets and metrics |
-| **Department Officer (Sanitation)** | `sanitation.officer@civic.local` | `Officer@123` | Scoped to Sanitation Department tickets and metrics |
-| **Administrator** | `admin@civic.local` | `Admin@123` | Full governance: departments, officers, users, stats |
+| **Citizen** | `citizen@civic.local` | `Citizen@123` | Citizen portal: Lodge grievances, draft sync, live tracking |
+| **Water Officer** | `officer@civic.local` | `Officer@123` | Scoped to Water Department tickets, SLA and status workflows |
+| **Sanitation Officer** | `sanitation.officer@civic.local` | `Officer@123` | Scoped to Sanitation Department tickets |
+| **Administrator** | `admin@civic.local` | `Admin@123` | Full governance: departments, officers, users, statistics |
+
+> **Security Note:** Demo credentials are exclusively for evaluation. Never enter production passwords or sensitive personal data.
 
 ---
 
-## 5 Practical SQL Verification Queries
+## API & Documentation References
 
-```sql
--- 1. Active complaints grouped by department and status
-SELECT d.name AS department, c.status, COUNT(*) AS total_tickets
-FROM civic_connect.complaints c
-JOIN civic_connect.departments d ON c.department_id = d.id
-GROUP BY d.name, c.status
-ORDER BY d.name, c.status;
-
--- 2. Detect SLA breaches across unresolved complaints
-SELECT c.complaint_code, c.title, d.name AS department, c.sla_deadline, c.status
-FROM civic_connect.complaints c
-JOIN civic_connect.departments d ON c.department_id = d.id
-WHERE c.sla_deadline < NOW() AND c.status NOT IN ('Resolved', 'Closed');
-
--- 3. Department performance and resolution summary
-SELECT d.name AS department,
-       COUNT(c.id) AS total_assigned,
-       SUM(CASE WHEN c.status = 'Resolved' THEN 1 ELSE 0 END) AS resolved_count,
-       SUM(CASE WHEN c.status = 'Submitted' THEN 1 ELSE 0 END) AS pending_count
-FROM civic_connect.departments d
-LEFT JOIN civic_connect.complaints c ON c.department_id = d.id
-GROUP BY d.id, d.name;
-
--- 4. Active officers and their assigned department scope
-SELECT u.id, u.name, u.email, u.phone, d.name AS assigned_department, u.active
-FROM civic_connect.users u
-JOIN civic_connect.departments d ON u.department_id = d.id
-WHERE u.role IN ('Department Officer', 'Officer');
-
--- 5. Full chronological timeline for a specific complaint
-SELECT t.title, t.status, t.description, t.updated_by, t.updated_by_role, t.created_at
-FROM civic_connect.complaint_timeline t
-WHERE t.complaint_id = 1
-ORDER BY t.created_at ASC;
-```
+- **REST API Contract:** Detailed request/response schemas and HTTP status codes are documented in [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
+- **Cloud Deployment Guide:** Step-by-step production deployment instructions, environment variable references, and operational considerations are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- **Backend Guide:** [backend/README.md](backend/README.md).
+- **Frontend Guide:** [frontend/README.md](frontend/README.md).
 
 ---
 
-## API Documentation
+## License
 
-For the full specification of HTTP methods, routes, request/response JSON schemas, and HTTP status codes, see [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
-
----
-
-## Known Limitations
-
-- No login lockout or rate limiting on authentication endpoints.
-- Mobile responsive design is desktop-first; mobile view uses standard responsive collapse.
-- Email and SMS notifications are simulated via database table `notifications`.
-- Geocoding and reverse geocoding rely on browser GPS and client-side coordinate accuracy.
-
-
----
-
-## Deployment (Production Architecture)
-
-### Architecture
-- **Frontend:** Vercel (Static Hosting / Single Page Application)
-- **Backend:** Render (Docker Web Service / Java 21 Spring Boot)
-- **Database:** Aiven (Managed MySQL Free Tier)
-
-### Environment Variables
-- **Vercel (Frontend):**
-  - VITE_API_BASE_URL (Points to Render backend, e.g. https://<render-service>.onrender.com/api)
-- **Render (Backend):**
-  - PORT (Provided by Render, routed to server.port)
-  - SPRING_DATASOURCE_URL (JDBC URL: jdbc:mysql://<AIVEN_HOST>:<AIVEN_PORT>/civic_connect?sslMode=REQUIRED&serverTimezone=UTC)
-  - SPRING_DATASOURCE_USERNAME (Aiven database user)
-  - SPRING_DATASOURCE_PASSWORD (Aiven database password)
-  - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE (Recommended 5 for free tier)
-  - SPRING_JPA_HIBERNATE_DDL_AUTO (update)
-  - APP_JWT_SECRET (Minimum 32-character / 64-hex random cryptographic secret)
-  - APP_CORS_ALLOWED_ORIGINS (Exact Vercel production URL, e.g. https://<app>.vercel.app)
-  - APP_SEED_DEMO_USERS (	rue on initial setup to seed demo accounts)
-
-### Free Tier & Operational Notes
-- **Render Cold Start:** Free instances sleep after 15 minutes of inactivity. The first request after sleep takes 30–60 seconds while the container initializes.
-- **Aiven Inactivity Power-Off:** Free MySQL instances may enter POWEROFF state when idle. Power on from the Aiven console or API before traffic.
-- **Demo Accounts Warning:** Public demo credentials are intended solely for evaluation and development. Never enter real personal identifying information or production secrets.
+This project is developed for educational and portfolio demonstration purposes. All rights reserved.
