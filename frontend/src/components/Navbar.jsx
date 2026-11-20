@@ -152,17 +152,15 @@ export default function Navbar({
                   )}
                 </div>
               ) : (
-                <div className="d-flex align-items-center gap-2">
-                  <button
-                    className="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold"
-                    onClick={() => {
-                      if (setAuthViewMode) setAuthViewMode('login');
-                      setActivePage('Login/Register');
-                    }}
-                  >
-                    Login
-                  </button>
-                </div>
+                <button
+                  className="btn btn-primary btn-sm rounded-pill px-4 fw-semibold shadow-sm"
+                  onClick={() => {
+                    if (setAuthViewMode) setAuthViewMode('login');
+                    setActivePage('Login/Register');
+                  }}
+                >
+                  Login
+                </button>
               )}
             </div>
           </div>
@@ -223,9 +221,9 @@ export default function Navbar({
                 </button>
               </div>
             ) : (
-              <div className="d-flex gap-2 border-top pt-2">
+              <div className="border-top pt-2">
                 <button
-                  className="btn btn-outline-primary btn-sm rounded-pill w-100"
+                  className="btn btn-primary btn-sm rounded-pill w-100 shadow-sm"
                   onClick={() => {
                     if (setAuthViewMode) setAuthViewMode('login');
                     setActivePage('Login/Register');

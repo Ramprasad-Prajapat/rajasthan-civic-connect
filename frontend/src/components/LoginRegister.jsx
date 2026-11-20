@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Logo from './Logo';
 import { loginUser, registerUser } from '../apiService';
+import { onlyDigits, normalizeMobile, isValidMobile, getMobileError, handleMobileKeyDown } from '../validators';
 
 export default function LoginRegister({
   authenticatedUser,
@@ -15,6 +16,8 @@ export default function LoginRegister({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
+  const [mobileTouched, setMobileTouched] = useState(false);
+  const mobileError = getMobileError(mobile, false, mobileTouched);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -38,7 +41,11 @@ export default function LoginRegister({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const user = await loginUser(email, password);
+      const trimmed = email.trim();
+      const identifier = !trimmed.includes('@') && /^\+?[\d\s-]+$/.test(trimmed)
+        ? normalizeMobile(trimmed)
+        : trimmed;
+      const user = await loginUser(identifier, password);
       setAuthenticatedUser(user);
 
       // Role-based landing page
@@ -61,10 +68,16 @@ export default function LoginRegister({
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
+    setMobileTouched(true);
+    if (mobile && !isValidMobile(mobile, false)) {
+      setErrorMsg(getMobileError(mobile, false, true) || 'Enter a valid 10-digit mobile number');
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
     try {
-      const user = await registerUser(name, email, password, mobile);
+      const normalizedMobile = mobile ? normalizeMobile(mobile) : '';
+      const user = await registerUser(name, email, password, normalizedMobile);
       setAuthenticatedUser(user);
       setActivePage('Home');
     } catch (err) {
@@ -139,15 +152,16 @@ export default function LoginRegister({
               /* LOGIN FORM */
               <form onSubmit={handleLoginSubmit}>
                 <div className="mb-3">
-                  <label className="form-label small fw-bold text-secondary mb-1">Email Address</label>
+                  <label className="form-label small fw-bold text-secondary mb-1">Email Address or Mobile</label>
                   <div className="input-group">
                     <span className="input-group-text bg-light border-0">
-                      <i className="bi bi-envelope text-muted"></i>
+                      <i className="bi bi-person text-muted"></i>
                     </span>
                     <input
-                      type="email"
+                      type="text"
+                      autoComplete="username"
                       className="form-control bg-light border-0 py-2 small"
-                      placeholder="name@example.com"
+                      placeholder="name@example.com or 10-digit mobile"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -173,6 +187,7 @@ export default function LoginRegister({
                       type="button"
                       className="input-group-text bg-light border-0"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
                     </button>
@@ -236,30 +251,63 @@ export default function LoginRegister({
                   <label className="form-label small fw-bold text-secondary mb-1">Mobile Number</label>
                   <input
                     type="tel"
-                    className="form-control bg-light border-0 py-2 small"
-                    placeholder="9876543210"
+                    inputMode="numeric"
+                    maxLength={Math.max(10, (mobile || '').length)}
+                    autoComplete="tel-national"
+                    className={`form-control bg-light border-0 py-2 small ${mobileError ? 'border border-danger' : ''}`}
+                    placeholder="10-digit mobile"
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
+                    onKeyDown={handleMobileKeyDown}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData ? e.clipboardData.getData('text') : '';
+                      const normalized = normalizeMobile(pasted);
+                      setMobile(normalized);
+                      setMobileTouched(true);
+                    }}
+                    onChange={(e) => {
+                      setMobileTouched(true);
+                      setMobile(normalizeMobile(e.target.value));
+                    }}
+                    onBlur={() => setMobileTouched(true)}
                   />
+                  {mobileError && (
+                    <div className="text-danger small mt-1 fw-semibold animate-fade-in" style={{ fontSize: '0.75rem' }}>
+                      <i className="bi bi-exclamation-circle me-1"></i>{mobileError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mb-4">
                   <label className="form-label small fw-bold text-secondary mb-1">Password *</label>
-                  <input
-                    type="password"
-                    className="form-control bg-light border-0 py-2 small"
-                    placeholder="Minimum 6 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
+                  <div className="input-group">
+                    <span className="input-group-text bg-light border-0">
+                      <i className="bi bi-lock text-muted"></i>
+                    </span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      className="form-control bg-light border-0 py-2 small"
+                      placeholder="Minimum 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      className="input-group-text bg-light border-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   className="btn btn-primary w-100 py-2.5 rounded-pill fw-semibold shadow-sm mb-3"
-                  disabled={loading}
+                  disabled={loading || Boolean(mobile && !isValidMobile(mobile, false))}
                 >
                   {loading ? (
                     <span>

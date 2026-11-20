@@ -40,7 +40,13 @@ export default function MyComplaints({ authenticatedUser, setActivePage }) {
           dept: c.departmentName || c.department || 'General Administration',
           worker: c.assignedWorker ? c.assignedWorker.name : 'Queue Assignment Pending',
           workerStatus: c.status === 'Resolved' || c.status === 'Closed' ? 'Work completed. Proof submitted.' : 'Work in progress.',
-          slaRemaining: c.status === 'Resolved' || c.status === 'Closed' ? 'Completed within SLA' : (c.slaHours ? `${c.slaHours} Hours` : '24 Hours'),
+          slaRemaining: c.status === 'Resolved' || c.status === 'Closed'
+            ? 'Completed within SLA'
+            : (c.slaHours
+                ? `${c.slaHours} Hours`
+                : (c.slaDeadline && c.createdAt
+                    ? `${Math.max(1, Math.round((new Date(c.slaDeadline).getTime() - new Date(c.createdAt).getTime()) / 3600000))} Hours`
+                    : '—')),
           beforePhoto: c.beforeProof || c.photo || '',
           afterPhoto: c.afterProof || '',
           remarks: c.remarks || c.officerRemarks || 'No officer comments logged.',

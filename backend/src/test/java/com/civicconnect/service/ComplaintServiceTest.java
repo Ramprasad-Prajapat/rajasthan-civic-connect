@@ -7,6 +7,7 @@ import com.civicconnect.exception.ApiException;
 import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.ComplaintTimelineRepository;
 import com.civicconnect.repository.DepartmentRepository;
+import com.civicconnect.repository.UserRepository;
 import com.civicconnect.util.Constants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,9 @@ class ComplaintServiceTest {
     private DepartmentRepository departmentRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private ComplaintMediaService mediaService;
 
     @Mock
@@ -49,6 +53,7 @@ class ComplaintServiceTest {
                 complaintRepository,
                 timelineRepository,
                 departmentRepository,
+                userRepository,
                 mediaService,
                 notificationService,
                 draftService
@@ -124,5 +129,69 @@ class ComplaintServiceTest {
         );
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void testAssignOfficerSuccess() {
+        User admin = new User("Admin", "admin@civic.local", "hash", "1234567890", Constants.ROLE_ADMIN, "admin");
+        admin.setId(99L);
+
+        User officer = new User("Water Officer", "water@civic.local", "hash", "9876543210", Constants.ROLE_OFFICER, "department");
+        officer.setId(5L);
+        officer.setDepartmentId(1L);
+
+        Complaint complaint = new Complaint();
+        complaint.setId(30L);
+        complaint.setComplaintCode("RJCIVIC-JAI-NNG-2026-0030");
+        complaint.setDepartmentId(1L);
+        complaint.setStatus(Constants.STATUS_SUBMITTED);
+
+        when(complaintRepository.findByComplaintCode("RJCIVIC-JAI-NNG-2026-0030")).thenReturn(Optional.of(complaint));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(officer));
+        when(complaintRepository.save(any(Complaint.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = complaintService.assignOfficer("RJCIVIC-JAI-NNG-2026-0030", 5L, admin);
+
+        assertNotNull(response);
+        assertEquals("5", response.assignedOfficerId());
+        assertEquals("Water Officer", response.assignedOfficerName());
+        verify(complaintRepository).save(complaint);
+    }
+
+    @Test
+    void testAssignOfficerWrongDepartmentThrowsBadRequest() {
+        User admin = new User("Admin", "admin@civic.local", "hash", "1234567890", Constants.ROLE_ADMIN, "admin");
+        admin.setId(99L);
+
+        User wrongDeptOfficer = new User("Sanitation Officer", "san@civic.local", "hash", "9876543211", Constants.ROLE_OFFICER, "department");
+        wrongDeptOfficer.setId(6L);
+        wrongDeptOfficer.setDepartmentId(2L); // Different department
+
+        Complaint complaint = new Complaint();
+        complaint.setId(31L);
+        complaint.setComplaintCode("RJCIVIC-JAI-NNG-2026-0031");
+        complaint.setDepartmentId(1L); // Water department
+
+        when(complaintRepository.findByComplaintCode("RJCIVIC-JAI-NNG-2026-0031")).thenReturn(Optional.of(complaint));
+        when(userRepository.findById(6L)).thenReturn(Optional.of(wrongDeptOfficer));
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                complaintService.assignOfficer("RJCIVIC-JAI-NNG-2026-0031", 6L, admin)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertTrue(ex.getMessage().contains("department"));
+    }
+
+    @Test
+    void testAssignOfficerNonAdminThrowsForbidden() {
+        User citizen = new User("Citizen", "cit@civic.local", "hash", "1234567890", Constants.ROLE_CITIZEN, "citizen");
+        citizen.setId(10L);
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                complaintService.assignOfficer("RJCIVIC-JAI-NNG-2026-0032", 5L, citizen)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
     }
 }

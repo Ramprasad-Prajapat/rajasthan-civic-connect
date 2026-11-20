@@ -21,6 +21,8 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     List<Complaint> findByDepartmentIdOrderByCreatedAtDesc(Long departmentId);
 
+    List<Complaint> findByAssignedOfficerIdOrderByCreatedAtDesc(Long assignedOfficerId);
+
     List<Complaint> findByDepartmentIdAndStatusOrderByCreatedAtDesc(Long departmentId, String status);
 
     List<Complaint> findByStatusOrderByCreatedAtDesc(String status);
@@ -33,6 +35,8 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
     long countByCitizenId(Long citizenId);
 
     long countByDepartmentId(Long departmentId);
+
+    long countByAssignedOfficerId(Long assignedOfficerId);
 
     long countByDepartmentIdAndStatus(Long departmentId, String status);
 

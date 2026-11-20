@@ -25,12 +25,15 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
   const [statusRemark, setStatusRemark] = useState('');
   const [updateLoading, setUpdateLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
+  const [refreshing, setRefreshing] = useState(false);
 
   const officerName = authenticatedUser?.name || authenticatedUser?.fullName || 'Department Officer';
   const departmentName = stats.departmentName || authenticatedUser?.departmentName || 'Assigned Department';
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const [statsData, complaintsList] = await Promise.all([
@@ -50,10 +53,12 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
       }
 
       setComplaints(Array.isArray(complaintsList) ? complaintsList : []);
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       setError(err.message || 'Failed to load department dashboard data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -61,16 +66,49 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
     loadData();
   }, [statusFilter]);
 
-  const openComplaintModal = async (idOrCode) => {
+  // Real-time reflection: auto-refresh every 15s while visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadData();
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [statusFilter]);
+
+  const openComplaintModal = async (complaintOrCode) => {
+    let initialData = null;
+    let code = '';
+    if (typeof complaintOrCode === 'object' && complaintOrCode !== null) {
+      initialData = complaintOrCode;
+      code = initialData.complaintCode || initialData.complaintId || initialData.id;
+    } else {
+      code = complaintOrCode;
+      initialData = complaints.find(c => (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code)));
+    }
+
+    // Immediately open modal with existing row data (<300ms)
+    if (initialData) {
+      setSelectedComplaint(initialData);
+      setNewStatus(initialData.status === 'Submitted' ? 'InProgress' : initialData.status === 'InProgress' ? 'Resolved' : 'Closed');
+      setStatusRemark('');
+    }
+
     setModalLoading(true);
     setActionMessage(null);
     try {
-      const data = await getComplaint(idOrCode);
-      setSelectedComplaint(data);
-      setNewStatus(data.status === 'Submitted' ? 'InProgress' : data.status === 'InProgress' ? 'Resolved' : 'Closed');
-      setStatusRemark('');
+      const data = await getComplaint(code);
+      if (data) {
+        setSelectedComplaint(prev => ({ ...(prev || {}), ...data }));
+        if (!initialData) {
+          setNewStatus(data.status === 'Submitted' ? 'InProgress' : data.status === 'InProgress' ? 'Resolved' : 'Closed');
+          setStatusRemark('');
+        }
+      }
     } catch (err) {
-      alert(err.message || 'Failed to load grievance details');
+      if (!initialData) {
+        alert(err.message || 'Failed to load grievance details');
+      }
     } finally {
       setModalLoading(false);
     }
@@ -79,18 +117,30 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
     if (!selectedComplaint) return;
+    const prevSelected = selectedComplaint;
+    const prevComplaints = complaints;
+    const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
+    const targetStatus = newStatus;
+
+    // Optimistic UI update
+    setSelectedComplaint(prev => ({ ...prev, status: targetStatus }));
+    setComplaints(prev => prev.map(c => (
+      (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code))
+        ? { ...c, status: targetStatus }
+        : c
+    )));
+
     setUpdateLoading(true);
     setActionMessage(null);
     try {
-      const updated = await updateComplaintStatus(
-        selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id,
-        newStatus,
-        statusRemark
-      );
-      setSelectedComplaint(updated);
-      setActionMessage({ type: 'success', text: `Status updated to ${newStatus} successfully!` });
+      const updated = await updateComplaintStatus(code, targetStatus, statusRemark);
+      setSelectedComplaint(prev => ({ ...(prev || {}), ...updated }));
+      setActionMessage({ type: 'success', text: `Status updated to ${targetStatus} successfully!` });
       loadData();
     } catch (err) {
+      // Rollback
+      setSelectedComplaint(prevSelected);
+      setComplaints(prevComplaints);
       setActionMessage({ type: 'danger', text: err.message || 'Failed to update status' });
     } finally {
       setUpdateLoading(false);
@@ -146,9 +196,19 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
               Logged in as: <strong>{officerName}</strong> &bull; {authenticatedUser?.email}
             </p>
           </div>
-          <button onClick={loadData} className="btn btn-light btn-sm rounded-pill px-3 py-2 fw-semibold align-self-start align-self-md-center shadow-sm">
-            <i className="bi bi-arrow-clockwise me-1"></i> Refresh Data
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-3 align-self-start align-self-md-center">
+            <span className="text-white text-opacity-75 small">
+              Last updated: <strong>{lastUpdated}</strong>
+            </span>
+            <button
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+              className="btn btn-light btn-sm rounded-pill px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-1.5"
+            >
+              <i className={`bi bi-arrow-clockwise ${refreshing ? 'spin' : ''}`}></i>
+              {refreshing ? 'Refreshing...' : 'Refresh Data'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -267,10 +327,17 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
                 filteredComplaints.map(c => {
                   const code = c.complaintCode || c.complaintId || `ID-${c.id}`;
                   const isOverdue = c.slaDeadline && new Date(c.slaDeadline) < new Date() && c.status !== 'Resolved' && c.status !== 'Closed';
+                  const isAssignedToMe = (c.assignedOfficerId && String(c.assignedOfficerId) === String(authenticatedUser?.id)) ||
+                    (c.assignedOfficerName && c.assignedOfficerName === officerName);
                   return (
                     <tr key={c.id || code}>
                       <td className="ps-4 fw-bold font-monospace text-primary small">
                         {code}
+                        {isAssignedToMe && (
+                          <span className="badge bg-success-soft text-success border border-success rounded-pill ms-1 fw-bold" style={{ fontSize: '0.65rem' }}>
+                            Assigned to you
+                          </span>
+                        )}
                       </td>
                       <td className="fw-semibold text-secondary small" style={{ maxWidth: '240px' }}>
                         <div className="text-truncate">{c.title || 'Untitled Issue'}</div>
@@ -289,7 +356,7 @@ export default function DepartmentDashboard({ authenticatedUser, handleSignOut }
                       <td className="text-end pe-4">
                         <button
                           className="btn btn-sm btn-outline-primary rounded-pill px-3"
-                          onClick={() => openComplaintModal(code)}
+                          onClick={() => openComplaintModal(c)}
                         >
                           View &bull; Update
                         </button>

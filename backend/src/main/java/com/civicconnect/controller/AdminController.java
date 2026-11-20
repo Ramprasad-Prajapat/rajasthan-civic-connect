@@ -45,7 +45,7 @@ public class AdminController {
     @PutMapping("/admin/officers/{id}")
     public ResponseEntity<UserResponse> updateOfficer(
             @PathVariable Long id,
-            @RequestBody UpdateOfficerRequest req,
+            @Valid @RequestBody UpdateOfficerRequest req,
             @AuthenticationPrincipal User caller
     ) {
         enforceAdmin(caller);

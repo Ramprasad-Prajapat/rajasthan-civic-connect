@@ -196,6 +196,16 @@ export async function getComplaint(idOrCode) {
 }
 
 /**
+ * Retrieves photo evidence lazily for a complaint ticket.
+ */
+export async function getComplaintPhoto(idOrCode) {
+  const response = await fetch(`${API_BASE_URL}/complaints/${encodeURIComponent(idOrCode)}/photo`, {
+    headers: getAuthHeader()
+  });
+  return await handleResponse(response);
+}
+
+/**
  * Updates status and remarks for a complaint ticket.
  */
 export async function updateComplaintStatus(idOrCode, status, remarks = '') {
@@ -223,6 +233,18 @@ export async function reassignComplaintDepartment(idOrCode, departmentId) {
     method: 'PUT',
     headers: getAuthHeader(),
     body: JSON.stringify({ departmentId })
+  });
+  return await handleResponse(response);
+}
+
+/**
+ * Assigns or unassigns an officer for a complaint ticket (Admin only).
+ */
+export async function assignComplaintOfficer(idOrCode, officerId) {
+  const response = await fetch(`${API_BASE_URL}/complaints/${encodeURIComponent(idOrCode)}/officer`, {
+    method: 'PUT',
+    headers: getAuthHeader(),
+    body: JSON.stringify({ officerId })
   });
   return await handleResponse(response);
 }
@@ -384,6 +406,15 @@ export async function getDepartmentStats() {
 export async function uploadFile(path, file) {
   if (!file) return null;
   return fileToBase64(file);
+}
+
+export async function checkHealth() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`);
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
 }
 
 export async function seedOnStartup() {

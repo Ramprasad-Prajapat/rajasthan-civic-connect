@@ -18,7 +18,7 @@ public final class SlaCalculator {
      */
     public static SlaResult calculateSla(String priority, boolean isEmergency) {
         int hours;
-        if (isEmergency) {
+        if (isEmergency || "Emergency".equalsIgnoreCase(priority)) {
             hours = 2;
         } else if ("Critical".equalsIgnoreCase(priority)) {
             hours = 6;

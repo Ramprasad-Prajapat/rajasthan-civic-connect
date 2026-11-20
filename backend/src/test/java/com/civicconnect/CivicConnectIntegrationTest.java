@@ -127,6 +127,40 @@ public class CivicConnectIntegrationTest {
     }
 
     @Test
+    void test2b_RegistrationPhoneValidation() throws Exception {
+        // 9 digits -> 400
+        RegisterRequest req9 = new RegisterRequest("Phone 9", "p9_" + System.currentTimeMillis() + "@test.local", "Password@123", "987654321", "Citizen", "citizen");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req9)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Mobile number must be exactly 10 digits"));
+
+        // 11 digits -> 400
+        RegisterRequest req11 = new RegisterRequest("Phone 11", "p11_" + System.currentTimeMillis() + "@test.local", "Password@123", "98765432100", "Citizen", "citizen");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req11)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Mobile number must be exactly 10 digits"));
+
+        // Letters -> 400
+        RegisterRequest reqAlpha = new RegisterRequest("Phone Alpha", "palpha_" + System.currentTimeMillis() + "@test.local", "Password@123", "98765abcd0", "Citizen", "citizen");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqAlpha)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Mobile number must be exactly 10 digits"));
+
+        // Empty string -> 201 (optional)
+        RegisterRequest reqEmpty = new RegisterRequest("Phone Empty", "pempty_" + System.currentTimeMillis() + "@test.local", "Password@123", "", "Citizen", "citizen");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqEmpty)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void test3_DuplicateRegistrationRejected() throws Exception {
         String email = "dup_" + System.currentTimeMillis() + "@test.local";
         RegisterRequest req = new RegisterRequest("User Dup", email, "Password@123", "1234567890", "Citizen", "citizen");
@@ -503,7 +537,9 @@ public class CivicConnectIntegrationTest {
         Complaint comp = complaintRepository.findByComplaintCode(code).orElseThrow();
         assertFalse(mediaRepository.findByComplaintIdOrderByCreatedAtAsc(comp.getId()).isEmpty(), "Photo media must persist in MySQL");
 
-        // Feedback persistence
+        // Feedback persistence requires Resolved/Closed status
+        comp.setStatus("Resolved");
+        complaintRepository.save(comp);
         mockMvc.perform(post("/api/feedback")
                         .header("Authorization", "Bearer " + citToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -714,12 +750,28 @@ public class CivicConnectIntegrationTest {
         String citizenEmail = "feedback_val_" + System.currentTimeMillis() + "@civic.local";
         createCitizenUser(citizenEmail, "Citizen@123");
         String token = obtainToken(citizenEmail, "Citizen@123", "citizen");
+        User cit = userRepository.findByEmail(citizenEmail).orElseThrow();
+        Department dept = departmentRepository.findAll().get(0);
+        Complaint comp = new Complaint();
+        comp.setComplaintCode("RJCIVIC-FEED-" + System.currentTimeMillis());
+        comp.setTitle("Feedback Test");
+        comp.setDescription("Testing feedback bounds");
+        comp.setCategory("water");
+        comp.setPriority("Normal");
+        comp.setStatus("Resolved");
+        comp.setCitizenId(cit.getId());
+        comp.setCitizenName(cit.getName());
+        comp.setCitizenEmail(cit.getEmail());
+        comp.setDepartmentId(dept.getId());
+        comp.setSlaDeadline(java.time.Instant.now().plus(java.time.Duration.ofDays(2)));
+        complaintRepository.save(comp);
+        String compCode = comp.getComplaintCode();
 
         // 1. Rating 0 -> 400
         mockMvc.perform(post("/api/feedback")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"complaintId\":\"1\",\"rating\":0,\"comment\":\"Bad\"}"))
+                        .content("{\"complaintId\":\"" + compCode + "\",\"rating\":0,\"comment\":\"Bad\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error").isString());
@@ -728,7 +780,7 @@ public class CivicConnectIntegrationTest {
         mockMvc.perform(post("/api/feedback")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"complaintId\":\"1\",\"rating\":6,\"comment\":\"Good\"}"))
+                        .content("{\"complaintId\":\"" + compCode + "\",\"rating\":6,\"comment\":\"Good\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error").isString());
@@ -737,7 +789,7 @@ public class CivicConnectIntegrationTest {
         mockMvc.perform(post("/api/feedback")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"complaintId\":\"1\",\"rating\":-1,\"comment\":\"Negative\"}"))
+                        .content("{\"complaintId\":\"" + compCode + "\",\"rating\":-1,\"comment\":\"Negative\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
@@ -745,7 +797,7 @@ public class CivicConnectIntegrationTest {
         mockMvc.perform(post("/api/feedback")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"complaintId\":\"1\",\"rating\":5,\"comment\":\"Excellent\"}"))
+                        .content("{\"complaintId\":\"" + compCode + "\",\"rating\":5,\"comment\":\"Excellent\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -765,6 +817,221 @@ public class CivicConnectIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error").value("Payload Too Large"))
                 .andExpect(jsonPath("$.message").isString());
+    }
+
+    @Test
+    void testTrackingAccessMatrixAndNoPhotoBytes() throws Exception {
+        if (departmentRepository.findByNameIgnoreCase("Water Department").isEmpty()) {
+            departmentRepository.save(new Department("Water Department", "WAT", "Water Supply and Sewerage", "0141-2222222"));
+        }
+        Department waterDept = departmentRepository.findByNameIgnoreCase("Water Department").orElseThrow();
+        if (departmentRepository.findByNameIgnoreCase("Sanitation Department").isEmpty()) {
+            departmentRepository.save(new Department("Sanitation Department", "SAN", "Solid Waste and Cleaning", "0141-3333333"));
+        }
+        Department sanDept = departmentRepository.findByNameIgnoreCase("Sanitation Department").orElseThrow();
+
+        // Citizen 1
+        String cit1Email = "track_cit1_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(cit1Email, "Test@123");
+        String cit1Token = obtainToken(cit1Email, "Test@123", "citizen");
+
+        // Citizen 2
+        String cit2Email = "track_cit2_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(cit2Email, "Test@123");
+        String cit2Token = obtainToken(cit2Email, "Test@123", "citizen");
+
+        // Water Officer
+        String waterOffEmail = "track_water_off_" + System.currentTimeMillis() + "@test.local";
+        createOfficerUser(waterOffEmail, "Officer@123", waterDept.getId());
+        String waterOffToken = obtainToken(waterOffEmail, "Officer@123", "department");
+
+        // Sanitation Officer
+        String sanOffEmail = "track_san_off_" + System.currentTimeMillis() + "@test.local";
+        createOfficerUser(sanOffEmail, "Officer@123", sanDept.getId());
+        String sanOffToken = obtainToken(sanOffEmail, "Officer@123", "department");
+
+        // Admin
+        String adminEmail = "track_admin_" + System.currentTimeMillis() + "@test.local";
+        createStaffUser(adminEmail, "Admin@123", Constants.ROLE_ADMIN);
+        String adminToken = obtainToken(adminEmail, "Admin@123", "admin");
+
+        // Citizen 1 lodges complaint with photo
+        String photoBase64 = "data:image/png;base64," + Base64.getEncoder().encodeToString("fake-photo-bytes".getBytes(StandardCharsets.UTF_8));
+        Map<String, Object> compReq = Map.of(
+                "title", "Water pipeline burst",
+                "description", "Heavy leak in main pipeline",
+                "category", "Water Leakage",
+                "department", "Water Department",
+                "district", "Jaipur",
+                "ulbName", "Nagar Nigam Jaipur",
+                "priority", "High",
+                "photo", photoBase64
+        );
+        MvcResult compRes = mockMvc.perform(post("/api/complaints")
+                        .header("Authorization", "Bearer " + cit1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(compReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode compNode = objectMapper.readTree(compRes.getResponse().getContentAsString());
+        String ticketCode = compNode.get("complaintId").asText();
+        Long compId = compNode.get("id").asLong();
+
+        // 1. Citizen 1 tracks by numeric ID -> 200, photo is empty (not in detail payload)
+        MvcResult trackByIdRes = mockMvc.perform(get("/api/complaints/" + compId)
+                        .header("Authorization", "Bearer " + cit1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.complaintId").value(ticketCode))
+                .andReturn();
+        JsonNode trackNode = objectMapper.readTree(trackByIdRes.getResponse().getContentAsString());
+        assertTrue(trackNode.path("photo").asText("").isEmpty(), "Tracking detail response should not contain heavy photo bytes");
+
+        // 2. Citizen 1 tracks by ticket code (lowercase / whitespace tolerant) -> 200
+        mockMvc.perform(get("/api/complaints/ " + ticketCode.toLowerCase() + " ")
+                        .header("Authorization", "Bearer " + cit1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.complaintId").value(ticketCode));
+
+        // 3. Citizen 1 calls lazy photo endpoint -> 200, hasPhoto=true
+        mockMvc.perform(get("/api/complaints/" + ticketCode + "/photo")
+                        .header("Authorization", "Bearer " + cit1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPhoto").value(true));
+
+        // 4. Other citizen (Citizen 2) tracks -> 403 Forbidden
+        mockMvc.perform(get("/api/complaints/" + ticketCode)
+                        .header("Authorization", "Bearer " + cit2Token))
+                .andExpect(status().isForbidden());
+
+        // 5. Unauthenticated user tracks -> 401 Unauthorized
+        mockMvc.perform(get("/api/complaints/" + ticketCode))
+                .andExpect(status().isUnauthorized());
+
+        // 6. Matching officer tracks -> 200 OK
+        mockMvc.perform(get("/api/complaints/" + ticketCode)
+                        .header("Authorization", "Bearer " + waterOffToken))
+                .andExpect(status().isOk());
+
+        // 7. Other department officer tracks -> 403 Forbidden
+        mockMvc.perform(get("/api/complaints/" + ticketCode)
+                        .header("Authorization", "Bearer " + sanOffToken))
+                .andExpect(status().isForbidden());
+
+        // 8. Admin tracks -> 200 OK
+        mockMvc.perform(get("/api/complaints/" + ticketCode)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testFeedbackOwnerEnforcementAndStatusCheck() throws Exception {
+        if (departmentRepository.findByNameIgnoreCase("Water Department").isEmpty()) {
+            departmentRepository.save(new Department("Water Department", "WAT", "Water Supply and Sewerage", "0141-2222222"));
+        }
+        Department waterDept = departmentRepository.findByNameIgnoreCase("Water Department").orElseThrow();
+
+        String cit1Email = "fb_cit1_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(cit1Email, "Test@123");
+        String cit1Token = obtainToken(cit1Email, "Test@123", "citizen");
+
+        String cit2Email = "fb_cit2_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(cit2Email, "Test@123");
+        String cit2Token = obtainToken(cit2Email, "Test@123", "citizen");
+
+        String waterOffEmail = "fb_off_" + System.currentTimeMillis() + "@test.local";
+        createOfficerUser(waterOffEmail, "Officer@123", waterDept.getId());
+        String waterOffToken = obtainToken(waterOffEmail, "Officer@123", "department");
+
+        // Create complaint (Submitted)
+        Map<String, Object> compReq = Map.of(
+                "title", "Leaking pipe near house",
+                "description", "Water spilling continuously",
+                "category", "Water Leakage",
+                "department", "Water Department",
+                "district", "Jaipur",
+                "ulbName", "Nagar Nigam Jaipur",
+                "priority", "Normal"
+        );
+        MvcResult compRes = mockMvc.perform(post("/api/complaints")
+                        .header("Authorization", "Bearer " + cit1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(compReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String ticketCode = objectMapper.readTree(compRes.getResponse().getContentAsString()).get("complaintId").asText();
+
+        // 1. Citizen 1 submits feedback while status is Submitted -> 400 Bad Request
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + cit1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"" + ticketCode + "\",\"rating\":5,\"comment\":\"Pending resolution\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Feedback can only be submitted for resolved or closed complaints"));
+
+        // 2. Officer resolves complaint
+        mockMvc.perform(put("/api/complaints/" + ticketCode + "/status")
+                        .header("Authorization", "Bearer " + waterOffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", "Resolved", "remark", "Repaired burst pipe"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("Resolved"));
+
+        // 3. Citizen 2 (non-owner) attempts feedback -> 403 Forbidden
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + cit2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"" + ticketCode + "\",\"rating\":5,\"comment\":\"Not my complaint\"}"))
+                .andExpect(status().isForbidden());
+
+        // 4. Citizen 1 (owner) submits feedback -> 200 OK
+        mockMvc.perform(post("/api/feedback")
+                        .header("Authorization", "Bearer " + cit1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"complaintId\":\"" + ticketCode + "\",\"rating\":5,\"comment\":\"Excellent rapid repair!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 5. Subsequent read confirms complaint status and timeline
+        mockMvc.perform(get("/api/complaints/" + ticketCode)
+                        .header("Authorization", "Bearer " + cit1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("Resolved"));
+    }
+
+    @Test
+    void testProfileUpdateValidationAndNonOwnerIsolation() throws Exception {
+        String email1 = "prof_u1_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(email1, "Pass@123");
+        String token1 = obtainToken(email1, "Pass@123", "citizen");
+
+        String email2 = "prof_u2_" + System.currentTimeMillis() + "@test.local";
+        createCitizenUser(email2, "Pass@123");
+        String token2 = obtainToken(email2, "Pass@123", "citizen");
+
+        // 1. Valid 10-digit phone update
+        mockMvc.perform(put("/api/auth/me")
+                        .header("Authorization", "Bearer " + token1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated Citizen\",\"phone\":\"9876543210\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated Citizen"))
+                .andExpect(jsonPath("$.phone").value("9876543210"));
+
+        // 2. Invalid 9-digit phone -> 400 Bad Request
+        mockMvc.perform(put("/api/auth/me")
+                        .header("Authorization", "Bearer " + token1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated Citizen\",\"phone\":\"987654321\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mobile number must be exactly 10 digits"));
+
+        // 3. User 2 profile is completely isolated and unchanged
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email2))
+                .andExpect(jsonPath("$.phone").value("2222222222"));
     }
 
     private String obtainToken(String email, String password, String portal) throws Exception {

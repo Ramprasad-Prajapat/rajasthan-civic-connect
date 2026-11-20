@@ -73,6 +73,12 @@ public class Complaint {
     @Column(name = "sla_hours")
     private Integer slaHours;
 
+    @Column(name = "assigned_officer_id")
+    private Long assignedOfficerId;
+
+    @Column(name = "assigned_officer_name")
+    private String assignedOfficerName;
+
     @Column(name = "sla_deadline")
     private Instant slaDeadline;
 
@@ -199,6 +205,12 @@ public class Complaint {
 
     public Instant getSlaDeadline() { return slaDeadline; }
     public void setSlaDeadline(Instant slaDeadline) { this.slaDeadline = slaDeadline; }
+
+    public Long getAssignedOfficerId() { return assignedOfficerId; }
+    public void setAssignedOfficerId(Long assignedOfficerId) { this.assignedOfficerId = assignedOfficerId; }
+
+    public String getAssignedOfficerName() { return assignedOfficerName; }
+    public void setAssignedOfficerName(String assignedOfficerName) { this.assignedOfficerName = assignedOfficerName; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

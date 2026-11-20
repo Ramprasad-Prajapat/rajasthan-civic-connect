@@ -30,6 +30,8 @@ public record ComplaintResponse(
         String priority,
         String departmentId,
         String departmentName,
+        String assignedOfficerId,
+        String assignedOfficerName,
         Integer slaHours,
         String slaDeadline,
         String status,
@@ -61,6 +63,7 @@ public record ComplaintResponse(
         String idStr = entity.getId() != null ? String.valueOf(entity.getId()) : null;
         String deptIdStr = entity.getDepartmentId() != null ? String.valueOf(entity.getDepartmentId()) : null;
         String citizenIdStr = entity.getCitizenId() != null ? String.valueOf(entity.getCitizenId()) : null;
+        String assignedOfficerIdStr = entity.getAssignedOfficerId() != null ? String.valueOf(entity.getAssignedOfficerId()) : null;
 
         return new ComplaintResponse(
                 idStr,
@@ -82,6 +85,8 @@ public record ComplaintResponse(
                 entity.getPriority(),
                 deptIdStr,
                 entity.getDepartmentName(),
+                assignedOfficerIdStr,
+                entity.getAssignedOfficerName(),
                 entity.getSlaHours(),
                 entity.getSlaDeadline() != null ? entity.getSlaDeadline().toString() : null,
                 entity.getStatus(),

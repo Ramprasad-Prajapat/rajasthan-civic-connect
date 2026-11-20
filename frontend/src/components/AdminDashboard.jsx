@@ -3,8 +3,10 @@ import {
   getAdminStats,
   getComplaints,
   getComplaint,
+  getComplaintPhoto,
   updateComplaintStatus,
   reassignComplaintDepartment,
+  assignComplaintOfficer,
   getDepartments,
   createDepartment,
   updateDepartment,
@@ -15,6 +17,7 @@ import {
   updateAdminOfficer,
   getAdminUsers
 } from '../apiService';
+import { onlyDigits, normalizeMobile, isValidMobile, getMobileError, handleMobileKeyDown } from '../validators';
 
 export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
   const [activeTab, setActiveTab] = useState('overview'); // overview, complaints, departments, officers, users
@@ -37,6 +40,10 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alertBanner, setAlertBanner] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
+  const [refreshing, setRefreshing] = useState(false);
+  const [modalDetailLoading, setModalDetailLoading] = useState(false);
+  const [modalPhoto, setModalPhoto] = useState(null);
 
   // Complaints tab filters
   const [filterDeptId, setFilterDeptId] = useState('all');
@@ -46,6 +53,7 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
   // Selected complaint modal & Reassign modal
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [reassignDeptId, setReassignDeptId] = useState('');
+  const [assignOfficerId, setAssignOfficerId] = useState('');
   const [newStatus, setNewStatus] = useState('InProgress');
   const [statusRemark, setStatusRemark] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -153,33 +161,121 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
     }
   }, [activeTab, filterStatus, filterDeptId]);
 
-  /* ========================================================================
-     COMPLAINTS ACTIONS
-     ======================================================================== */
-  const openComplaintModal = async (idOrCode) => {
+  // Real-time reflection: auto-refresh every 15s while page is visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadStats();
+        if (activeTab === 'complaints') loadComplaints();
+        else if (activeTab === 'departments') loadDepartments();
+        else if (activeTab === 'officers') loadOfficers();
+        else if (activeTab === 'users') loadUsers();
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [activeTab, filterStatus, filterDeptId]);
+
+  // Refresh all dashboard datasets
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
     try {
-      const data = await getComplaint(idOrCode);
-      setSelectedComplaint(data);
-      setNewStatus(data.status === 'Submitted' ? 'InProgress' : data.status === 'InProgress' ? 'Resolved' : 'Closed');
-      setStatusRemark('');
-      setReassignDeptId(data.departmentId || '');
+      await Promise.all([
+        loadStats(),
+        loadDepartments(),
+        activeTab === 'complaints' ? loadComplaints() :
+        activeTab === 'officers' ? loadOfficers() :
+        activeTab === 'users' ? loadUsers() : Promise.resolve()
+      ]);
+      setLastUpdated(new Date().toLocaleTimeString());
+      showAlert('success', 'Administration data refreshed successfully');
     } catch (err) {
-      showAlert('danger', err.message || 'Failed to open complaint details');
+      showAlert('danger', err.message || 'Failed to refresh administration data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  /* ========================================================================
+     COMPLAINTS ACTIONS (Fast <300ms click-to-visible, optimistic updates)
+     ======================================================================== */
+  const openComplaintModal = async (complaintOrCode) => {
+    let initialData = null;
+    let code = '';
+    if (typeof complaintOrCode === 'object' && complaintOrCode !== null) {
+      initialData = complaintOrCode;
+      code = initialData.complaintCode || initialData.complaintId || initialData.id;
+    } else {
+      code = complaintOrCode;
+      initialData = complaints.find(c => (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code)));
+    }
+
+    // Immediately open modal with existing row data (<300ms)
+    if (initialData) {
+      setSelectedComplaint(initialData);
+      setNewStatus(initialData.status === 'Submitted' ? 'InProgress' : initialData.status === 'InProgress' ? 'Resolved' : 'Closed');
+      setStatusRemark('');
+      setReassignDeptId(initialData.departmentId || '');
+      setAssignOfficerId(initialData.assignedOfficerId || '');
+    }
+
+    setModalPhoto(null);
+    setModalDetailLoading(true);
+
+    try {
+      const data = await getComplaint(code);
+      if (data) {
+        setSelectedComplaint(prev => ({ ...(prev || {}), ...data }));
+        setAssignOfficerId(data.assignedOfficerId || '');
+        if (!initialData) {
+          setNewStatus(data.status === 'Submitted' ? 'InProgress' : data.status === 'InProgress' ? 'Resolved' : 'Closed');
+          setStatusRemark('');
+          setReassignDeptId(data.departmentId || '');
+        }
+      }
+      // Lazily fetch photo evidence
+      getComplaintPhoto(code)
+        .then(res => {
+          if (res && res.hasPhoto && res.photo) {
+            setModalPhoto(res.photo);
+          }
+        })
+        .catch(() => {});
+    } catch (err) {
+      if (!initialData) {
+        showAlert('danger', err.message || 'Failed to open complaint details');
+      }
+    } finally {
+      setModalDetailLoading(false);
     }
   };
 
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
     if (!selectedComplaint) return;
+    const prevSelected = selectedComplaint;
+    const prevComplaints = complaints;
+    const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
+    const targetStatus = newStatus;
+
+    // Optimistic UI update
+    setSelectedComplaint(prev => ({ ...prev, status: targetStatus }));
+    setComplaints(prev => prev.map(c => (
+      (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code))
+        ? { ...c, status: targetStatus }
+        : c
+    )));
+
     setActionLoading(true);
     try {
-      const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
-      const updated = await updateComplaintStatus(code, newStatus, statusRemark);
-      setSelectedComplaint(updated);
-      showAlert('success', `Status updated to ${newStatus}`);
+      const updated = await updateComplaintStatus(code, targetStatus, statusRemark);
+      setSelectedComplaint(prev => ({ ...(prev || {}), ...updated }));
+      showAlert('success', `Status updated to ${targetStatus}`);
       loadComplaints();
       loadStats();
     } catch (err) {
+      // Rollback on failure
+      setSelectedComplaint(prevSelected);
+      setComplaints(prevComplaints);
       showAlert('danger', err.message || 'Failed to update status');
     } finally {
       setActionLoading(false);
@@ -189,16 +285,76 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
   const handleReassignDepartment = async (e) => {
     e.preventDefault();
     if (!selectedComplaint || !reassignDeptId) return;
+    const prevSelected = selectedComplaint;
+    const prevComplaints = complaints;
+    const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
+    const targetDeptId = Number(reassignDeptId);
+    const targetDeptObj = departments.find(d => Number(d.id) === targetDeptId);
+    const targetDeptName = targetDeptObj ? targetDeptObj.name : 'Reassigned Department';
+
+    // Optimistic UI update
+    setSelectedComplaint(prev => ({
+      ...prev,
+      departmentId: targetDeptId,
+      departmentName: targetDeptName
+    }));
+    setComplaints(prev => prev.map(c => (
+      (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code))
+        ? { ...c, departmentId: targetDeptId, departmentName: targetDeptName }
+        : c
+    )));
+
     setActionLoading(true);
     try {
-      const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
-      const updated = await reassignComplaintDepartment(code, Number(reassignDeptId));
-      setSelectedComplaint(updated);
+      const updated = await reassignComplaintDepartment(code, targetDeptId);
+      setSelectedComplaint(prev => ({ ...(prev || {}), ...updated }));
       showAlert('success', 'Department reassigned successfully!');
       loadComplaints();
       loadStats();
     } catch (err) {
+      // Rollback on failure
+      setSelectedComplaint(prevSelected);
+      setComplaints(prevComplaints);
       showAlert('danger', err.message || 'Failed to reassign department');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAssignOfficer = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    const prevSelected = selectedComplaint;
+    const prevComplaints = complaints;
+    const code = selectedComplaint.complaintCode || selectedComplaint.complaintId || selectedComplaint.id;
+    const officerId = assignOfficerId ? Number(assignOfficerId) : null;
+    const officerObj = officers.find(o => Number(o.id) === officerId);
+    const officerName = officerObj ? (officerObj.name || officerObj.email) : null;
+
+    // Optimistic UI update
+    setSelectedComplaint(prev => ({
+      ...prev,
+      assignedOfficerId: officerId,
+      assignedOfficerName: officerName
+    }));
+    setComplaints(prev => prev.map(c => (
+      (c.complaintCode === code || c.complaintId === code || String(c.id) === String(code))
+        ? { ...c, assignedOfficerId: officerId, assignedOfficerName: officerName }
+        : c
+    )));
+
+    setActionLoading(true);
+    try {
+      const updated = await assignComplaintOfficer(code, officerId);
+      setSelectedComplaint(prev => ({ ...(prev || {}), ...updated }));
+      showAlert('success', officerId ? `Assigned to ${officerName} successfully!` : 'Officer unassigned successfully!');
+      loadComplaints();
+      loadStats();
+    } catch (err) {
+      // Rollback on failure
+      setSelectedComplaint(prevSelected);
+      setComplaints(prevComplaints);
+      showAlert('danger', err.message || 'Failed to assign officer');
     } finally {
       setActionLoading(false);
     }
@@ -296,6 +452,10 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
 
   const handleSaveOfficer = async (e) => {
     e.preventDefault();
+    if (officerForm.phone && !isValidMobile(officerForm.phone, false)) {
+      showAlert('danger', getMobileError(officerForm.phone, false, true) || 'Enter a valid 10-digit mobile number');
+      return;
+    }
     setActionLoading(true);
     try {
       if (editingOfficer) {
@@ -349,7 +509,7 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
 
   return (
     <div className="container py-4">
-      {/* Admin Banner */}
+      {/* Admin Header */}
       <div className="card border-0 rounded-4 shadow-sm p-4 mb-4" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white' }}>
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
           <div>
@@ -358,15 +518,22 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
             </span>
             <h2 className="fw-bold mb-1">State Administration &amp; Governance</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Supervising municipal grievances, departmental directories, and officer assignments across Rajasthan.
+              Complaints, departments and officers
             </p>
           </div>
-          <button
-            onClick={() => { loadStats(); loadDepartments(); }}
-            className="btn btn-outline-light btn-sm rounded-pill px-3 py-2 fw-semibold align-self-start align-self-md-center"
-          >
-            <i className="bi bi-arrow-clockwise me-1"></i> Sync Metrics
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-3 align-self-start align-self-md-center">
+            <span className="text-white text-opacity-75 small">
+              Last updated: <strong>{lastUpdated}</strong>
+            </span>
+            <button
+              onClick={handleRefreshAll}
+              disabled={refreshing}
+              className="btn btn-outline-light btn-sm rounded-pill px-3 py-2 fw-semibold d-flex align-items-center gap-1.5"
+            >
+              <i className={`bi bi-arrow-clockwise ${refreshing ? 'spin' : ''}`}></i>
+              {refreshing ? 'Refreshing...' : 'Refresh data'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -573,7 +740,7 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
                           <td className="text-end pe-4">
                             <button
                               className="btn btn-sm btn-outline-primary rounded-pill px-3"
-                              onClick={() => openComplaintModal(code)}
+                              onClick={() => openComplaintModal(c)}
                             >
                               Manage
                             </button>
@@ -829,19 +996,39 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
                   </div>
                 </div>
 
+                {/* Ground photo evidence if available */}
+                {modalPhoto && (
+                  <div className="mb-3 text-center bg-dark p-2 rounded-3">
+                    <img src={modalPhoto} alt="Grievance Ground Photo" className="img-fluid rounded" style={{ maxHeight: '180px', objectFit: 'contain' }} />
+                    <span className="text-white text-xxs d-block mt-1">Ground Photo Evidence</span>
+                  </div>
+                )}
+
                 {/* Timeline */}
                 <div className="mb-4">
-                  <span className="text-muted small fw-semibold d-block mb-2">Complaint Timeline:</span>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-muted small fw-semibold">Complaint Timeline:</span>
+                    {modalDetailLoading && (
+                      <span className="text-muted text-xxs">
+                        <span className="spinner-border spinner-border-sm me-1" style={{ width: '0.7rem', height: '0.7rem' }}></span>
+                        Loading details...
+                      </span>
+                    )}
+                  </div>
                   <div className="border rounded-3 p-3 bg-white" style={{ maxHeight: '160px', overflowY: 'auto' }}>
-                    {selectedComplaint.timeline?.map((ev, i) => (
-                      <div key={i} className="border-bottom py-1.5 small">
-                        <strong>{ev.title || ev.status}: </strong>
-                        <span>{ev.remarks || ev.description}</span>
-                        <span className="text-muted text-xxs d-block" style={{ fontSize: '0.68rem' }}>
-                          By {ev.actorName || ev.actorRole} &bull; {ev.createdAt ? new Date(ev.createdAt).toLocaleString() : ''}
-                        </span>
-                      </div>
-                    ))}
+                    {selectedComplaint.timeline && selectedComplaint.timeline.length > 0 ? (
+                      selectedComplaint.timeline.map((ev, i) => (
+                        <div key={i} className="border-bottom py-1.5 small">
+                          <strong>{ev.title || ev.status}: </strong>
+                          <span>{ev.remarks || ev.description}</span>
+                          <span className="text-muted text-xxs d-block" style={{ fontSize: '0.68rem' }}>
+                            By {ev.updatedBy || ev.actorName || ev.updatedByRole || ev.actorRole || 'Staff'} &bull; {ev.timestamp || ev.createdAt ? new Date(ev.timestamp || ev.createdAt).toLocaleString() : ''}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-muted small">No timeline events logged yet.</span>
+                    )}
                   </div>
                 </div>
 
@@ -881,7 +1068,7 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
                 </div>
 
                 {/* 2. Reassign Department Box */}
-                <div className="card border-0 bg-light rounded-3 p-3">
+                <div className="card border-0 bg-light rounded-3 p-3 mb-3">
                   <h6 className="fw-bold text-secondary mb-2">Reassign Department</h6>
                   <form onSubmit={handleReassignDepartment}>
                     <div className="row g-2 align-items-center">
@@ -901,6 +1088,41 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
                       <div className="col-sm-4 text-end">
                         <button type="submit" className="btn btn-warning btn-sm rounded-pill px-3 w-100" disabled={actionLoading}>
                           Reassign
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 3. Assign Officer Box */}
+                <div className="card border-0 bg-light rounded-3 p-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h6 className="fw-bold text-secondary mb-0">Assign Officer</h6>
+                    {selectedComplaint.assignedOfficerName && (
+                      <span className="badge bg-primary-soft text-primary small">
+                        Assigned: {selectedComplaint.assignedOfficerName}
+                      </span>
+                    )}
+                  </div>
+                  <form onSubmit={handleAssignOfficer}>
+                    <div className="row g-2 align-items-center">
+                      <div className="col-sm-8">
+                        <select
+                          className="form-select form-select-sm"
+                          value={assignOfficerId}
+                          onChange={(e) => setAssignOfficerId(e.target.value)}
+                        >
+                          <option value="">-- Unassigned --</option>
+                          {officers
+                            .filter(o => !selectedComplaint.departmentId || String(o.departmentId) === String(selectedComplaint.departmentId))
+                            .map(o => (
+                              <option key={o.id} value={o.id}>{o.name || o.email} ({o.departmentName || 'Officer'})</option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="col-sm-4 text-end">
+                        <button type="submit" className="btn btn-primary btn-sm rounded-pill px-3 w-100" disabled={actionLoading}>
+                          Assign Officer
                         </button>
                       </div>
                     </div>
@@ -1026,11 +1248,27 @@ export default function AdminDashboard({ authenticatedUser, handleSignOut }) {
                   <div className="mb-2">
                     <label className="form-label small fw-bold text-secondary mb-1">Phone</label>
                     <input
-                      type="text"
-                      className="form-control form-control-sm"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={Math.max(10, (officerForm.phone || '').length)}
+                      autoComplete="tel-national"
+                      className={`form-control form-control-sm ${officerForm.phone && !isValidMobile(officerForm.phone, false) ? 'border border-danger' : ''}`}
                       value={officerForm.phone}
-                      onChange={(e) => setOfficerForm({ ...officerForm, phone: e.target.value })}
+                      onKeyDown={handleMobileKeyDown}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData ? e.clipboardData.getData('text') : '';
+                        const normalized = normalizeMobile(pasted);
+                        setOfficerForm(prev => ({ ...prev, phone: normalized }));
+                      }}
+                      onChange={(e) => setOfficerForm({ ...officerForm, phone: normalizeMobile(e.target.value) })}
+                      placeholder="10-digit phone"
                     />
+                    {officerForm.phone && !isValidMobile(officerForm.phone, false) && (
+                      <div className="text-danger small mt-1 fw-semibold animate-fade-in" style={{ fontSize: '0.75rem' }}>
+                        <i className="bi bi-exclamation-circle me-1"></i>{getMobileError(officerForm.phone, false, true)}
+                      </div>
+                    )}
                   </div>
                   {!editingOfficer && (
                     <div className="mb-2">
