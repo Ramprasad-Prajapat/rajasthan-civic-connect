@@ -1,16 +1,19 @@
 package com.civicconnect.service;
 
 import com.civicconnect.dto.FeedbackRequest;
+import com.civicconnect.entity.Complaint;
 import com.civicconnect.entity.Feedback;
 import com.civicconnect.entity.User;
 import com.civicconnect.exception.ApiException;
 import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.FeedbackRepository;
+import com.civicconnect.util.Constants;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service managing citizen satisfaction feedback ratings.
@@ -34,6 +37,25 @@ public class FeedbackService {
 
         String complaintId = request.complaintId() != null && !request.complaintId().isBlank() ?
                 request.complaintId().trim() : "RJCIVIC-GENERAL";
+
+        Optional<Complaint> complaintOpt = complaintRepository.findByComplaintCode(complaintId);
+        if (complaintOpt.isEmpty()) {
+            try {
+                Long numericId = Long.parseLong(complaintId);
+                complaintOpt = complaintRepository.findById(numericId);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        if (complaintOpt.isPresent()) {
+            Complaint complaint = complaintOpt.get();
+            if (!caller.getId().equals(complaint.getCitizenId())) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Only the owner may submit feedback for this complaint");
+            }
+            if (!Constants.STATUS_RESOLVED.equalsIgnoreCase(complaint.getStatus()) &&
+                !Constants.STATUS_CLOSED.equalsIgnoreCase(complaint.getStatus())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Feedback can only be submitted for resolved or closed complaints");
+            }
+        }
 
         Integer rating = request.rating() != null ? request.rating() : 5;
         String comment = request.comment() != null ? request.comment() : "";

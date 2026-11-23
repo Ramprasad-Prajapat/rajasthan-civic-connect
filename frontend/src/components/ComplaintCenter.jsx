@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createComplaint, getComplaint, submitFeedback, reopenComplaint, saveComplaintDraft, getComplaintDraft, deleteComplaintDraft } from '../apiService';
+import { createComplaint, getComplaint, getComplaintPhoto, submitFeedback, reopenComplaint, saveComplaintDraft, getComplaintDraft, deleteComplaintDraft } from '../apiService';
+import { onlyDigits, normalizeMobile, isValidMobile, getMobileError, handleMobileKeyDown } from '../validators';
 import MapPicker from './MapPicker';
 export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, authenticatedUser = null }) {
   // Page sections: 'submit' (form), 'track' (tracking), 'reopen' (reopen form)
@@ -37,8 +38,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   const [submitError, setSubmitError] = useState('');
 
 
-  // Ticking SLA countdown for track details
-  const [countdownSeconds, setCountdownSeconds] = useState(21594); // ~6 hours in seconds
+  const [mobileTouched, setMobileTouched] = useState(false);
+  const mobileError = getMobileError(formData.mobile, true, mobileTouched);
 
   // FAQ Expanded index state
   const [faqIndex, setFaqIndex] = useState(0);
@@ -46,6 +47,19 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   // Tracking States
   const [trackID, setTrackID] = useState('');
   const [trackingResult, setTrackingResult] = useState(null);
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackError, setTrackError] = useState('');
+  const [trackColdStart, setTrackColdStart] = useState(false);
+  const [lazyPhoto, setLazyPhoto] = useState(null);
+  const [lazyPhotoLoading, setLazyPhotoLoading] = useState(false);
+  const [slaInfo, setSlaInfo] = useState({
+    statusText: '',
+    badgeClass: 'bg-primary-soft text-primary',
+    label: 'On track',
+    remainingText: '',
+    isComplete: false,
+    isOverdue: false
+  });
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -59,17 +73,19 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   const [showDistDropdown, setShowDistDropdown] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
-  // Smart Location System States
-  const [locationMethod, setLocationMethod] = useState('manual'); // 'manual', 'current', 'map'
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState('');
-  const [locationSuccess, setLocationSuccess] = useState('');
-  const [coordinates, setCoordinates] = useState({ lat: null, lng: null, accuracy: null });
-  const [detectedAddress, setDetectedAddress] = useState(null);
-  const [locationSource, setLocationSource] = useState('MANUAL_SELECTION');
+  // Location Selection States (Manual Entry Primary + Keyless OpenStreetMap Picker)
+  const [locationMethod, setLocationMethod] = useState('manual'); // 'manual' (main path), 'map' (interactive picker)
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const [mapCenter, setMapCenter] = useState([26.9124, 75.7873]); // Default: Jaipur
+  const [mapCenter, setMapCenter] = useState([26.9124, 75.7873]); // Default: Jaipur, Rajasthan
   const [markerPosition, setMarkerPosition] = useState(null);
+  const [coordinates, setCoordinates] = useState({ lat: null, lng: null });
+  const [locationSource, setLocationSource] = useState('MANUAL_ENTRY');
+
+  const handleMapLocationSelect = (lat, lng) => {
+    setCoordinates({ lat, lng });
+    setMarkerPosition([lat, lng]);
+    setLocationSource('MAP_SELECTION');
+  };
 
   // Fetch local Rajasthan ULB master dataset
   useEffect(() => {
@@ -123,7 +139,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
         ...prev,
         name: authenticatedUser.fullName || authenticatedUser.name || prev.name,
         email: authenticatedUser.email || prev.email,
-        mobile: authenticatedUser.phone || authenticatedUser.mobile || prev.mobile
+        mobile: onlyDigits(authenticatedUser.phone || authenticatedUser.mobile || prev.mobile)
       }));
     }
   }, [authenticatedUser]);
@@ -154,9 +170,16 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
       }
 
       if (draftData && !isSubmitted) {
-        setFormData(prev => ({ ...prev, ...draftData.formData }));
-        if (draftData.coordinates) setCoordinates(draftData.coordinates);
-        if (draftData.detectedAddress) setDetectedAddress(draftData.detectedAddress);
+        setFormData(prev => ({
+          ...prev,
+          ...draftData.formData,
+          mobile: onlyDigits(draftData.formData?.mobile || prev.mobile)
+        }));
+        if (draftData.coordinates) {
+          setCoordinates(draftData.coordinates);
+          setMarkerPosition([draftData.coordinates.lat, draftData.coordinates.lng]);
+        }
+        if (draftData.locationMethod) setLocationMethod(draftData.locationMethod);
         if (draftData.locationSource) setLocationSource(draftData.locationSource);
         if (draftData.currentStep) setCurrentStep(draftData.currentStep);
       }
@@ -173,7 +196,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
       const draftData = {
         formData,
         coordinates,
-        detectedAddress,
+        locationMethod,
         locationSource,
         currentStep,
         updatedAt: new Date().toISOString()
@@ -188,7 +211,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [formData, coordinates, detectedAddress, locationSource, currentStep, authenticatedUser, showOnlyTrack, isSubmitted]);
+  }, [formData, coordinates, locationMethod, locationSource, currentStep, authenticatedUser, showOnlyTrack, isSubmitted]);
 
   // Dropdown dependency Handlers
   const handleDistrictChange = (selectedDist) => {
@@ -262,96 +285,80 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
     setWards(wardList);
   };
 
-  // SLA ticking countdown effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 21594));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-
-  const formatCountdown = (totalSeconds) => {
-    const hrs = Math.floor(totalSeconds / 3600);
-    const mins = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-    return `${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
-  };
-
   // Category mapping metadata and department auto-routing
   const categoriesMap = {
     'Garbage Collection': {
-      dept: 'Sanitation Department', SLA: '24 Hours', priority: 'Medium Priority',
+      dept: 'Sanitation Department',
       icon: 'bi-trash3-fill', color: 'text-success bg-primary-soft',
       subs: ['Daily waste pickup', 'Garbage dump clearance', 'Community bin overflow']
     },
     'Water Leakage': {
-      dept: 'Water Supply Department', SLA: '12 Hours', priority: 'High Priority',
+      dept: 'Water Supply Department',
       icon: 'bi-droplet-fill', color: 'text-danger bg-danger-soft',
       subs: ['Main line leak', 'Service line damage', 'Valve leakage']
     },
     'Water Supply': {
-      dept: 'Water Supply Department', SLA: '24 Hours', priority: 'High Priority',
+      dept: 'Water Supply Department',
       icon: 'bi-droplet-half', color: 'text-primary bg-secondary-soft',
       subs: ['No water supply', 'Low pressure', 'Contaminated water supply']
     },
     'Sewer Overflow': {
-      dept: 'Sewerage Department', SLA: '6 Hours', priority: 'High Priority',
+      dept: 'Sewerage Department',
       icon: 'bi-funnel-fill', color: 'text-danger bg-danger-soft',
       subs: ['Road overflow', 'Backflow in house', 'Manhole damage']
     },
     'Drainage Blockage': {
-      dept: 'Sewerage Department', SLA: '12 Hours', priority: 'High Priority',
+      dept: 'Sewerage Department',
       icon: 'bi-exclamation-octagon-fill', color: 'text-danger bg-danger-soft',
       subs: ['Stormwater drain block', 'Main drain choking', 'Open cover block']
     },
     'Street Light Issue': {
-      dept: 'Electrical Department', SLA: '48 Hours', priority: 'Medium Priority',
+      dept: 'Electrical Department',
       icon: 'bi-lightbulb-fill', color: 'text-success bg-primary-soft',
       subs: ['Bulb/LED fused', 'Complete street dark', 'Timer issue']
     },
     'Open Electrical Wire': {
-      dept: 'Electrical Department', SLA: '4 Hours', priority: 'High Priority',
+      dept: 'Electrical Department',
       icon: 'bi-lightning-charge-fill', color: 'text-danger bg-danger-soft',
       subs: ['Hanging wires', 'Pole spark', 'Transformer wire open']
     },
     'Road Damage': {
-      dept: 'Public Works Department', SLA: '72 Hours', priority: 'Low Priority',
+      dept: 'Public Works Department',
       icon: 'bi-cone-striped', color: 'text-secondary bg-light',
       subs: ['Major cracks', 'Divider broken', 'Footpath damaged']
     },
     'Potholes': {
-      dept: 'Public Works Department', SLA: '48 Hours', priority: 'Medium Priority',
+      dept: 'Public Works Department',
       icon: 'bi-signpost-split-fill', color: 'text-warning bg-accent-soft',
       subs: ['Multiple deep potholes', 'Pothole patch sink']
     },
     'Public Toilet Maintenance': {
-      dept: 'Sanitation Department', SLA: '12 Hours', priority: 'Medium Priority',
+      dept: 'Sanitation Department',
       icon: 'bi-badge-wc-fill', color: 'text-success bg-primary-soft',
       subs: ['Dirty cabins', 'No water supply', 'Light not working']
     },
     'Park Maintenance': {
-      dept: 'Public Works Department', SLA: '5 Days', priority: 'Low Priority',
+      dept: 'Public Works Department',
       icon: 'bi-flower1', color: 'text-secondary bg-light',
       subs: ['Broken bench', 'Uncut wild grass', 'Play swings damaged']
     },
     'Encroachment': {
-      dept: 'Encroachment Department', SLA: '3 Days', priority: 'Medium Priority',
+      dept: 'Encroachment Department',
       icon: 'bi-x-octagon-fill', color: 'text-warning bg-accent-soft',
       subs: ['Footpath shop blockade', 'Illegal parking block', 'Temporary tin shed']
     },
     'Animal Issue': {
-      dept: 'Animal Control Department', SLA: '24 Hours', priority: 'Medium Priority',
+      dept: 'Animal Control Department',
       icon: 'bi-bug-fill', color: 'text-warning bg-accent-soft',
       subs: ['Stray dog menace', 'Monkey gang threat', 'Stray cattle on road']
     },
     'Tree Damage': {
-      dept: 'Forest & Environment Department', SLA: '24 Hours', priority: 'Low Priority',
+      dept: 'Forest & Environment Department',
       icon: 'bi-tree-fill', color: 'text-success bg-primary-soft',
       subs: ['Fallen tree branch', 'Dried unsafe tree', 'Pruning request']
     },
     'Other': {
-      dept: 'General Administration', SLA: '48 Hours', priority: 'Low Priority',
+      dept: 'General Administration',
       icon: 'bi-grid-fill', color: 'text-secondary bg-light',
       subs: ['General civic concern', 'Unspecified urban issue']
     }
@@ -431,140 +438,15 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
   };
 
   const stages = [
-    { title: 'Submitted', desc: 'Complaint registered' },
-    { title: 'Under Review', desc: 'Photos & tags verified' },
-    { title: 'Approved', desc: 'ULB validation success' },
-    { title: 'Assigned', desc: 'Department routed' },
-    { title: 'In Progress', desc: 'Team in progress' },
-    { title: 'Work Started', desc: 'Physical repair in progress' },
-    { title: 'Proof Uploaded', desc: 'Completion photo log received' },
-    { title: 'Officer Verification', desc: 'Nodal physical review' },
-    { title: 'Resolved', desc: 'Case marked resolved' },
-    { title: 'Citizen Feedback', desc: 'Rating feedback locked' },
-    { title: 'Closed', desc: 'Locked from reopening' }
+    { key: 'Submitted', title: 'Submitted', desc: 'Complaint registered' },
+    { key: 'InProgress', title: 'In Progress', desc: 'Team in progress' },
+    { key: 'Resolved', title: 'Resolved', desc: 'Action completed by officer' },
+    { key: 'Closed', title: 'Closed', desc: 'Case permanently closed' }
   ];
 
   // ============================================================
-  // SMART LOCATION SYSTEM — Real GPS + Reverse Geocode + Auto-Fill
+  // MUNICIPAL LOCATION SELECTION — Verified Rajasthan ULB Cascades
   // ============================================================
-
-  // Auto-fill district cascade from detected GPS location
-  const autoFillFromGPS = (detectedDistrict, area, fullAddr) => {
-    if (!districts || districts.length === 0) return;
-    
-    // Fuzzy match: find best matching district name
-    const cleanDetected = detectedDistrict.toLowerCase().replace(/\s+district$/i, '').trim();
-    const match = districts.find(d => {
-      const cleanD = d.toLowerCase();
-      return cleanD === cleanDetected || 
-             cleanD.includes(cleanDetected) || 
-             cleanDetected.includes(cleanD);
-    });
-
-    if (match) {
-      handleDistrictChange(match);
-      setLocationSuccess(`Location detected! District matched: ${match}`);
-    } else {
-      setLocationSuccess(`Location detected in Rajasthan. Please verify district selection.`);
-    }
-
-    // Auto-fill area and address fields from geocoded data
-    setFormData(prev => ({
-      ...prev,
-      area: area || prev.area,
-      fullAddress: fullAddr || prev.fullAddress
-    }));
-  };
-
-  // Reverse geocode lat/lng using Nominatim (OpenStreetMap free API)
-  const reverseGeocode = async (lat, lng) => {
-    setLocationError('');
-    setLocationSuccess('');
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=en`,
-        { headers: { 'User-Agent': 'RajCivicConnect/1.0' } }
-      );
-      const data = await res.json();
-      
-      const addr = data.address || {};
-      const state = addr.state || '';
-      const district = addr.state_district || addr.county || '';
-      const city = addr.city || addr.town || addr.village || '';
-      const area = addr.suburb || addr.neighbourhood || addr.hamlet || '';
-      const fullAddress = data.display_name || '';
-
-      const detected = { state, district, city, area, fullAddress };
-      setDetectedAddress(detected);
-
-      if (state.toLowerCase().includes('rajasthan')) {
-        autoFillFromGPS(district, area, fullAddress);
-      } else {
-        setLocationError('This service is currently available only for Rajasthan. Detected state: ' + (state || 'Unknown'));
-      }
-    } catch (err) {
-      console.error('Reverse geocode failed:', err);
-      setLocationError('Failed to fetch address. Please check your internet connection.');
-    }
-    setLocationLoading(false);
-  };
-
-  // Real browser GPS detection
-  const handleUseCurrentLocation = (e) => {
-    if (e) e.preventDefault();
-    setLocationLoading(true);
-    setLocationError('');
-    setLocationSuccess('');
-
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser.');
-      setLocationLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        setCoordinates({ lat: latitude, lng: longitude, accuracy });
-        setLocationSource('CURRENT_LOCATION');
-        setGpsVerified(true);
-        setMapCenter([latitude, longitude]);
-        setMarkerPosition([latitude, longitude]);
-        setShowMapPicker(true);
-        reverseGeocode(latitude, longitude);
-      },
-      (error) => {
-        let msg = 'Location detection failed.';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            msg = 'Location permission denied. Please allow location access in your browser settings.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            msg = 'Location unavailable. Make sure GPS is enabled on your device.';
-            break;
-          case error.TIMEOUT:
-            msg = 'Location request timed out. Please try again.';
-            break;
-        }
-        setLocationError(msg);
-        setLocationLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  };
-
-  // Handle map click / marker drag for "Choose on Map" flow
-  const handleMapLocationSelect = (lat, lng) => {
-    setCoordinates({ lat, lng, accuracy: null });
-    setMarkerPosition([lat, lng]);
-    setLocationSource('MAP_SELECTION');
-    setGpsVerified(true);
-    setLocationLoading(true);
-    reverseGeocode(lat, lng);
-  };
-
-  // Legacy compat alias
-  const handleAutoLocation = handleUseCurrentLocation;
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -621,28 +503,37 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
       photo: formData.photoPreview || null,
       latitude: coordinates.lat || null,
       longitude: coordinates.lng || null,
-      accuracy: coordinates.accuracy || null,
-      address: detectedAddress?.fullAddress || formData.fullAddress || '',
-      areaColony: formData.area || detectedAddress?.area || '',
+      accuracy: null,
+      address: formData.fullAddress || '',
+      areaColony: formData.area || '',
       locationSource: locationSource,
-      priority: currentCategoryMeta.priority || 'Normal'
+      priority: formData.priority || 'Normal'
     };
 
     try {
       const result = await createComplaint(complaintData, formData.photo);
       const complaintId = result.complaintId || result.id || 'RJCIVIC-UNKNOWN';
+      const apiSlaHours = result.slaHours || (result.createdAt && result.slaDeadline
+        ? Math.max(1, Math.round((new Date(result.slaDeadline).getTime() - new Date(result.createdAt).getTime()) / 3600000))
+        : null);
       
       setSuccessDetails({
         id: complaintId,
-        category: formData.category,
-        subcategory: formData.subcategory,
+        category: result.category || formData.category,
+        subcategory: result.subCategory || formData.subcategory,
         sambhag: formData.sambhag,
-        district: formData.district,
-        ulb: formData.ulbName,
-        ward: formData.ward,
-        dept: currentCategoryMeta.dept,
-        priority: currentCategoryMeta.priority,
-        sla: currentCategoryMeta.SLA
+        district: result.district || formData.district,
+        ulb: result.ulbName || formData.ulbName,
+        ward: result.wardNumber || formData.ward,
+        dept: result.departmentName || currentCategoryMeta.dept,
+        departmentName: result.departmentName || currentCategoryMeta.dept,
+        priority: result.priority || 'Normal',
+        createdAt: result.createdAt,
+        slaHours: apiSlaHours,
+        slaDeadline: result.slaDeadline,
+        sla: apiSlaHours ? `${apiSlaHours} Hours` : '—',
+        assignedOfficerId: result.assignedOfficerId || null,
+        assignedOfficerName: result.assignedOfficerName || null
       });
       setIsSubmitted(true);
 
@@ -659,55 +550,208 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
     }
   };
 
+  // SLA Countdown & Compliance state calculation
+  useEffect(() => {
+    if (!trackingResult || !trackingResult.slaDeadline) return;
+
+    const updateSla = () => {
+      const isComplete = trackingResult.status === 'Resolved' || trackingResult.status === 'Closed';
+      const deadline = new Date(trackingResult.slaDeadline).getTime();
+
+      if (isComplete) {
+        const resolvedTime = trackingResult.resolvedAt ? new Date(trackingResult.resolvedAt).getTime() : Date.now();
+        const onTime = resolvedTime <= deadline;
+        setSlaInfo({
+          statusText: onTime ? 'Resolved on time' : 'Resolved late',
+          badgeClass: onTime ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning',
+          label: onTime ? 'Completed on time' : 'Completed late',
+          remainingText: onTime ? 'Resolved on time' : 'Resolved late',
+          isComplete: true,
+          isOverdue: !onTime
+        });
+        return;
+      }
+
+      const diff = deadline - Date.now();
+      if (diff <= 0) {
+        const overdue = Math.abs(diff);
+        const h = Math.floor(overdue / 3600000);
+        const m = Math.floor((overdue % 3600000) / 60000);
+        const s = Math.floor((overdue % 60000) / 1000);
+        setSlaInfo({
+          statusText: `Overdue by ${h}h ${m}m ${s}s`,
+          badgeClass: 'bg-danger-soft text-danger',
+          label: 'Overdue',
+          remainingText: `Overdue by ${h}h ${m}m`,
+          isComplete: false,
+          isOverdue: true
+        });
+      } else {
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        setSlaInfo({
+          statusText: `SLA DUE IN: ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`,
+          badgeClass: 'bg-primary-soft text-primary',
+          label: 'On track',
+          remainingText: `${h}h ${m}m remaining`,
+          isComplete: false,
+          isOverdue: false
+        });
+      }
+    };
+
+    updateSla();
+    const interval = setInterval(updateSla, 1000);
+    return () => clearInterval(interval);
+  }, [trackingResult]);
+
+  // Real-time reflection: auto-poll every 15s while visible
+  useEffect(() => {
+    if (!trackingResult || !trackingResult.id) return;
+
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        getComplaint(trackingResult.id)
+          .then(updated => {
+            if (updated) {
+              setTrackingResult(prev => ({
+                ...prev,
+                status: updated.status,
+                remarks: updated.remarks || prev.remarks,
+                departmentName: updated.departmentName || prev.departmentName,
+                dept: updated.departmentName || prev.dept,
+                timeline: updated.timeline || prev.timeline,
+                resolvedAt: updated.resolvedAt || prev.resolvedAt,
+                closedAt: updated.closedAt || prev.closedAt
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+    }, 15000);
+
+    return () => clearInterval(pollInterval);
+  }, [trackingResult?.id]);
+
+  // Auto-search pending complaint ID from session storage
+  useEffect(() => {
+    const pendingId = sessionStorage.getItem('rajcivic_pending_track_id');
+    if (pendingId) {
+      sessionStorage.removeItem('rajcivic_pending_track_id');
+      setTrackID(pendingId);
+      setActiveSection('track');
+      handleTrackSearch(null, pendingId);
+    }
+  }, [showOnlyTrack]);
+
   // Handle Tracking Search
-  const handleTrackSearch = async (e) => {
-    e.preventDefault();
-    if (!trackID) return;
+  const handleTrackSearch = async (e, directId = null) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const query = (directId || trackID || '').trim();
+    if (!query) return;
+
     setFeedbackSubmitted(false);
-    setLoading(true);
-    
+    setTrackLoading(true);
+    setTrackError('');
+    setTrackColdStart(false);
+
+    const coldStartTimer = setTimeout(() => {
+      setTrackColdStart(true);
+    }, 3000);
+
     try {
-      const result = await getComplaint(trackID);
+      const fetchPromise = getComplaint(query);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out after 20 seconds. Please check connection and retry.')), 20000)
+      );
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
+      clearTimeout(coldStartTimer);
+      setTrackColdStart(false);
+
       if (result) {
-        // Map database fields to local UI mapping
+        const apiSlaHours = result.slaHours || (result.createdAt && result.slaDeadline
+          ? Math.max(1, Math.round((new Date(result.slaDeadline).getTime() - new Date(result.createdAt).getTime()) / 3600000))
+          : null);
+        const slaTotal = apiSlaHours ? `${apiSlaHours} Hours` : '—';
         const mappedResult = {
           ...result,
-          id: result.id || result.complaintId,
-          category: result.category,
-          subcategory: result.subcategory || result.subcategoryName,
-          title: result.title,
-          description: result.description,
-          status: result.status,
-          date: result.createdAt ? new Date(result.createdAt).toLocaleDateString() : new Date(result.timestamp).toLocaleDateString(),
-          time: result.createdAt ? new Date(result.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(result.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          district: result.district,
-          ulb: result.ulbName || result.ulb,
-          ward: result.ward,
-          dept: result.department,
-          officer: result.officer || 'Shri Amit Sharma (Nodal Engineer)',
-          slaActive: true,
-          slaTotal: result.slaDays ? `${result.slaDays * 24} Hours` : '24 Hours',
-          slaRemaining: result.status === 'Resolved' || result.status === 'Closed' ? 'Completed within SLA' : 'SLA Active',
-          beforeProof: result.beforeProof || result.photo,
-          afterProof: result.afterProof,
-          officerRemarks: result.remarks || result.officerRemarks || 'No officer comments logged yet.',
-          timeline: result.timeline || [],
-          activeIdx: result.status === 'Closed' ? 10 : result.status === 'Resolved' ? 9 : result.status === 'InProgress' ? 7 : result.status === 'Assigned' ? 5 : result.status === 'Verified' ? 3 : 1
+          id: result.complaintId || result.id,
+          ticketCode: result.complaintId || result.id,
+          title: result.title || 'Civic Issue',
+          category: (result.category || '').replace(/-+$/, '').trim(),
+          subcategory: (result.subCategory || result.subcategory || '').replace(/-+$/, '').trim(),
+          description: result.description || '',
+          status: result.status || 'Submitted',
+          date: result.createdAt ? new Date(result.createdAt).toLocaleDateString() : '',
+          time: result.createdAt ? new Date(result.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          district: result.district || 'Rajasthan',
+          ulb: result.ulbName || result.ulb || '',
+          ward: result.wardNumber || result.ward || '',
+          areaColony: result.areaColony || '',
+          address: result.address || '',
+          dept: result.departmentName || result.department || 'Municipal Administration',
+          departmentName: result.departmentName || result.department || 'Municipal Administration',
+          priority: result.priority || 'Normal',
+          slaTotal,
+          slaHours: apiSlaHours,
+          slaDeadline: result.slaDeadline,
+          resolvedAt: result.resolvedAt,
+          closedAt: result.closedAt,
+          citizenId: result.citizenId,
+          citizenName: result.citizenName,
+          citizenEmail: result.citizenEmail,
+          citizenPhone: result.citizenPhone,
+          assignedOfficerId: result.assignedOfficerId,
+          assignedOfficerName: result.assignedOfficerName,
+          remarks: result.remarks || '',
+          timeline: result.timeline || []
         };
         setTrackingResult(mappedResult);
+        setTrackID(query);
         setFeedbackRating(result.rating || 5);
         setFeedbackComment(result.feedback || '');
-        if (result.status === 'Closed' || result.rating > 0) {
+        if (result.status === 'Closed' || (result.rating && result.rating > 0)) {
           setFeedbackSubmitted(true);
         }
+
+        // Lazy-load photo evidence lazily
+        setLazyPhoto(null);
+        setLazyPhotoLoading(true);
+        getComplaintPhoto(query)
+          .then(photoRes => {
+            if (photoRes && photoRes.hasPhoto && photoRes.photo) {
+              setLazyPhoto(photoRes.photo);
+            }
+          })
+          .catch(err => {
+            console.warn("Lazy photo load error:", err);
+          })
+          .finally(() => {
+            setLazyPhotoLoading(false);
+          });
       } else {
-        alert("Grievance ID not found! Kripya sahi Complaint ID enter karein.");
+        setTrackError('Grievance file not found. Please verify the Ticket Code / Complaint ID.');
         setTrackingResult(null);
       }
     } catch (err) {
+      clearTimeout(coldStartTimer);
+      setTrackColdStart(false);
       console.error("Tracking lookup failed:", err);
+      const msg = err.message || '';
+      if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+        setTrackError('Grievance file not found. Please verify the Ticket Code / Complaint ID.');
+      } else if (msg.includes('403') || msg.toLowerCase().includes('forbidden')) {
+        setTrackError('Access forbidden: you do not have permission to view this complaint.');
+      } else if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+        setTrackError('Please log in to track this complaint.');
+      } else {
+        setTrackError(msg || 'Could not fetch grievance status. Please retry.');
+      }
+      setTrackingResult(null);
     } finally {
-      setLoading(false);
+      setTrackLoading(false);
     }
   };
 
@@ -732,25 +776,20 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
 
   // Handle Feedback Submission
   const handleFeedbackSubmit = async () => {
-    if (!trackingResult) return;
+    if (!trackingResult || !trackingResult.id) return;
     setLoading(true);
     try {
-      const userStr = localStorage.getItem('rajcivic_user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-      const userId = currentUser ? (currentUser.uid || currentUser.email) : 'anonymous';
-
-      await submitFeedback(trackingResult.id, feedbackRating, feedbackComment, userId);
+      await submitFeedback(trackingResult.id, feedbackRating, feedbackComment);
       setFeedbackSubmitted(true);
       setTrackingResult(prev => ({
         ...prev,
         status: 'Closed',
         rating: feedbackRating,
-        feedback: feedbackComment,
-        activeIdx: 10
+        feedback: feedbackComment
       }));
     } catch (err) {
       console.error("Feedback submission failed:", err);
-      alert("Failed to submit feedback: " + err.message);
+      alert("Failed to submit feedback: " + (err.message || 'Please try again'));
     } finally {
       setLoading(false);
     }
@@ -806,7 +845,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
         {!showOnlyTrack && (
           <div className="row g-3 mb-4 text-start">
             {[
-              { title: 'Report New Complaint', desc: 'Register a new civic issue with geolocations & photos.', icon: 'bi-megaphone', target: 'submit', color: 'border-success hover-success' },
+              { title: 'Report New Complaint', desc: 'Register a new civic issue with municipal address & photos.', icon: 'bi-megaphone', target: 'submit', color: 'border-success hover-success' },
               { title: 'Track Complaint', desc: 'Lookup existing complaint lifecycle & officer remarks.', icon: 'bi-compass', target: 'track', color: 'border-primary hover-primary' },
               { title: 'Reopen Complaint', desc: 'Reopen cases marked completed with fake/unstable proofs.', icon: 'bi-arrow-counterclockwise', target: 'reopen', color: 'border-warning hover-warning' }
             ].map((act, idx) => (
@@ -903,10 +942,34 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                         <div className="col-sm-6">
                           <label className="form-label small fw-bold text-secondary">Mobile Number (Active) *</label>
                           <input 
-                            type="tel" required value={formData.mobile} 
-                            onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
-                            className="form-control rc-form-control p-3 bg-light border-0 rounded-3 text-secondary" placeholder="Enter active 10-digit mobile" 
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={Math.max(10, (formData.mobile || '').length)}
+                            autoComplete="tel-national"
+                            required
+                            value={formData.mobile} 
+                            onKeyDown={handleMobileKeyDown}
+                            onPaste={(e) => {
+                              e.preventDefault();
+                              const pasted = e.clipboardData ? e.clipboardData.getData('text') : '';
+                              const normalized = normalizeMobile(pasted);
+                              setFormData(prev => ({ ...prev, mobile: normalized }));
+                              setMobileTouched(true);
+                            }}
+                            onChange={(e) => {
+                              setMobileTouched(true);
+                              const normalized = normalizeMobile(e.target.value);
+                              setFormData(prev => ({ ...prev, mobile: normalized }));
+                            }}
+                            onBlur={() => setMobileTouched(true)}
+                            className={`form-control rc-form-control p-3 bg-light border-0 rounded-3 text-secondary ${mobileError ? 'border border-danger' : ''}`}
+                            placeholder="Enter active 10-digit mobile" 
                           />
+                          {mobileError && (
+                            <div className="text-danger small mt-1 fw-semibold animate-fade-in" style={{ fontSize: '0.75rem' }}>
+                              <i className="bi bi-exclamation-circle me-1"></i>{mobileError}
+                            </div>
+                          )}
                         </div>
                         <div className="col-sm-12">
                           <label className="form-label small fw-bold text-secondary">Email Address (Optional)</label>
@@ -921,65 +984,46 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                       <div className="text-end border-top pt-3">
                         <button 
                           type="button" 
-                          disabled={!formData.name || !formData.mobile}
+                          disabled={!formData.name || !isValidMobile(formData.mobile, true)}
                           onClick={() => setCurrentStep(2)} 
                           className="btn rc-btn-primary px-4 py-2"
                         >
-                          Next: Location & GPS <i className="bi bi-chevron-right ms-1"></i>
+                          Next: Location Selection <i className="bi bi-chevron-right ms-1"></i>
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* STEP 2: SMART LOCATION SYSTEM — Real GPS + Map + Manual */}
+                  {/* STEP 2: MUNICIPAL LOCATION SELECTION */}
                   {currentStep === 2 && (
                     <div className="animate-fade-in">
                       <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h6 className="fw-bold text-secondary m-0">2. Smart Location Selection</h6>
-                        <span className="badge bg-success-soft text-success border border-success border-opacity-10 py-1 px-2.5 rounded" style={{ fontSize: '0.62rem' }}>
-                          <i className="bi bi-broadcast me-1 animate-pulse"></i> Real GPS Enabled
+                        <h6 className="fw-bold text-secondary m-0">2. Municipal Jurisdiction & Location</h6>
+                        <span className="badge bg-primary-soft text-primary border border-primary border-opacity-10 py-1 px-2.5 rounded" style={{ fontSize: '0.62rem' }}>
+                          <i className="bi bi-geo-alt-fill me-1"></i> Verified Rajasthan ULBs
                         </span>
                       </div>
 
-                      {/* Location Method Selector — 3 Premium Buttons */}
+                      {/* Location Mode Toggle: Manual Entry (Main Path) & OpenStreetMap Picker */}
                       <div className="row g-2 mb-4">
-                        <div className="col-4">
+                        <div className="col-6">
                           <button 
                             type="button"
-                            className={`btn w-100 rounded-3 py-3 d-flex flex-column align-items-center gap-1 transition-all border ${
+                            className={`btn w-100 rounded-3 py-2.5 d-flex flex-column align-items-center gap-1 transition-all border ${
                               locationMethod === 'manual' 
                                 ? 'btn-success text-white shadow-sm border-success' 
                                 : 'btn-outline-secondary bg-light text-secondary border-light hover-light'
                             }`}
-                            onClick={() => { setLocationMethod('manual'); setLocationSource('MANUAL_SELECTION'); setShowMapPicker(false); }}
+                            onClick={() => { setLocationMethod('manual'); setLocationSource('MANUAL_ENTRY'); setShowMapPicker(false); }}
                           >
                             <i className="bi bi-pencil-square fs-5"></i>
-                            <span className="fw-bold" style={{ fontSize: '0.68rem' }}>Manual Entry</span>
+                            <span className="fw-bold" style={{ fontSize: '0.72rem' }}>Manual Entry (Main Path)</span>
                           </button>
                         </div>
-                        <div className="col-4">
+                        <div className="col-6">
                           <button 
                             type="button"
-                            className={`btn w-100 rounded-3 py-3 d-flex flex-column align-items-center gap-1 transition-all border ${
-                              locationMethod === 'current' 
-                                ? 'btn-success text-white shadow-sm border-success' 
-                                : 'btn-outline-secondary bg-light text-secondary border-light hover-light'
-                            }`}
-                            onClick={() => { setLocationMethod('current'); handleUseCurrentLocation(); }}
-                            disabled={locationLoading}
-                          >
-                            {locationLoading && locationMethod === 'current' ? (
-                              <div className="spinner-border spinner-border-sm text-success" role="status"></div>
-                            ) : (
-                              <i className="bi bi-crosshair fs-5"></i>
-                            )}
-                            <span className="fw-bold" style={{ fontSize: '0.68rem' }}>Use GPS</span>
-                          </button>
-                        </div>
-                        <div className="col-4">
-                          <button 
-                            type="button"
-                            className={`btn w-100 rounded-3 py-3 d-flex flex-column align-items-center gap-1 transition-all border ${
+                            className={`btn w-100 rounded-3 py-2.5 d-flex flex-column align-items-center gap-1 transition-all border ${
                               locationMethod === 'map' 
                                 ? 'btn-success text-white shadow-sm border-success' 
                                 : 'btn-outline-secondary bg-light text-secondary border-light hover-light'
@@ -987,55 +1031,18 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                             onClick={() => { setLocationMethod('map'); setLocationSource('MAP_SELECTION'); setShowMapPicker(true); }}
                           >
                             <i className="bi bi-map fs-5"></i>
-                            <span className="fw-bold" style={{ fontSize: '0.68rem' }}>Choose on Map</span>
+                            <span className="fw-bold" style={{ fontSize: '0.72rem' }}>Choose on Map</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Loading State */}
-                      {locationLoading && (
-                        <div className="alert alert-info border-0 p-3 rounded-3 mb-3 d-flex align-items-center gap-2 animate-fade-in">
-                          <div className="spinner-grow spinner-grow-sm text-primary" role="status"></div>
-                          <span className="text-secondary small fw-bold" style={{ fontSize: '0.72rem' }}>
-                            {!detectedAddress ? 'Detecting your location...' : 'Matching with Rajasthan districts...'}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Error State */}
-                      {locationError && (
-                        <div className="alert alert-warning border-0 p-3 rounded-3 mb-3 d-flex align-items-start gap-2 animate-fade-in">
-                          <i className="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
-                          <div>
-                            <strong className="text-secondary small d-block">Location Issue</strong>
-                            <span className="text-muted" style={{ fontSize: '0.72rem' }}>{locationError}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Success State */}
-                      {locationSuccess && !locationLoading && (
-                        <div className="alert alert-success border-0 p-3 rounded-3 mb-3 d-flex align-items-start gap-2 animate-fade-in">
-                          <i className="bi bi-patch-check-fill text-success fs-5"></i>
-                          <div>
-                            <strong className="text-secondary small d-block">{locationSuccess}</strong>
-                            {coordinates.lat && (
-                              <span className="text-muted font-monospace" style={{ fontSize: '0.65rem' }}>
-                                Lat: {coordinates.lat.toFixed(6)}° • Lon: {coordinates.lng.toFixed(6)}°
-                                {coordinates.accuracy && ` • Accuracy: ${coordinates.accuracy.toFixed(1)}m`}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Interactive Leaflet Map — shown for GPS and Map modes */}
+                      {/* Interactive OpenStreetMap Leaflet Picker */}
                       {showMapPicker && (
                         <div className="mb-4 animate-fade-in">
                           <div className="d-flex justify-content-between align-items-center mb-2">
                             <span className="text-muted small fw-bold" style={{ fontSize: '0.72rem' }}>
                               <i className="bi bi-map-fill text-success me-1"></i>
-                              {locationMethod === 'map' ? 'Click on map to select location. Drag marker to adjust.' : 'Your detected location:'}
+                              Click on map to pin location. Drag marker to adjust.
                             </span>
                             <button 
                               type="button" 
@@ -1047,25 +1054,19 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                             </button>
                           </div>
                           <MapPicker
-                            center={mapCenter}
-                            zoom={14}
+                            center={markerPosition || mapCenter}
+                            zoom={13}
                             markerPosition={markerPosition}
                             onLocationSelect={handleMapLocationSelect}
-                            height="300px"
+                            height="280px"
                           />
-                        </div>
-                      )}
-
-                      {/* Detected Address Preview */}
-                      {detectedAddress && !locationLoading && (
-                        <div className="card border-0 bg-light rounded-3 p-3 mb-4 animate-fade-in">
-                          <div className="d-flex align-items-center gap-2 mb-2">
-                            <i className="bi bi-geo-alt-fill text-danger"></i>
-                            <span className="fw-bold text-secondary small">Detected Address</span>
-                          </div>
-                          <p className="text-muted small mb-0" style={{ fontSize: '0.74rem', lineHeight: '1.5' }}>
-                            {detectedAddress.fullAddress}
-                          </p>
+                          {coordinates.lat && (
+                            <div className="mt-2 text-start">
+                              <span className="badge bg-success-soft text-success small">
+                                <i className="bi bi-geo-alt-fill me-1"></i> Pinned: {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1447,7 +1448,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                           <div className="col-4"><span className="d-block text-muted">ULB Name:</span><strong className="text-secondary">{formData.ulbName || '—'}</strong></div>
                           <div className="col-4"><span className="d-block text-muted">Ward:</span><strong className="text-secondary">{formData.ward || '—'}</strong></div>
                           <div className="col-4"><span className="d-block text-muted">Area:</span><strong className="text-secondary">{formData.area || '—'}</strong></div>
-                          <div className="col-4"><span className="d-block text-muted">GPS:</span><strong className="text-secondary">{coordinates.lat ? `${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)}` : 'Not set'}</strong></div>
+                          <div className="col-4"><span className="d-block text-muted">Entry Mode:</span><strong className="text-secondary">{locationMethod === 'map' && coordinates.lat ? `Map (${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)})` : 'Manual ULB'}</strong></div>
                         </div>
                       </div>
 
@@ -1486,8 +1487,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                       <div className="card border border-success border-opacity-25 rounded-3 p-3 mb-3" style={{ background: 'rgba(16,185,129,0.04)' }}>
                         <div className="row g-1 small text-muted" style={{ fontSize: '0.74rem' }}>
                           <div className="col-4"><span className="d-block text-muted">Department:</span><strong className="text-success">{currentCategoryMeta.dept}</strong></div>
-                          <div className="col-4"><span className="d-block text-muted">Priority:</span><strong className="text-danger">{currentCategoryMeta.priority}</strong></div>
-                          <div className="col-4"><span className="d-block text-muted">SLA Target:</span><strong className="text-success">{currentCategoryMeta.SLA}</strong></div>
+                          <div className="col-4"><span className="d-block text-muted">Priority:</span><strong className="text-secondary">{formData.priority || 'Normal'}</strong></div>
+                          <div className="col-4"><span className="d-block text-muted">SLA Target:</span><strong className="text-success">{formData.priority === 'Emergency' ? '2 Hours' : formData.priority === 'Critical' ? '6 Hours' : formData.priority === 'High' ? '12 Hours' : '48 Hours'}</strong></div>
                         </div>
                       </div>
 
@@ -1541,7 +1542,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                   </div>
                   <div className="p-2.5 rounded-3 bg-light border border-light">
                     <span className="text-muted d-block small">Expected Resolution Time</span>
-                    <strong className="text-success">{currentCategoryMeta.SLA}</strong>
+                    <strong className="text-success">{formData.priority === 'Emergency' ? '2 Hours' : formData.priority === 'Critical' ? '6 Hours' : formData.priority === 'High' ? '12 Hours' : '48 Hours'}</strong>
                   </div>
                   <div className="p-2.5 rounded-3 bg-light border border-light">
                     <span className="text-muted d-block small">Assigned Municipal Dept</span>
@@ -1549,8 +1550,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                   </div>
                   <div className="p-2.5 rounded-3 bg-light border border-light">
                     <span className="text-muted d-block small">Priority System Rating</span>
-                    <span className={`badge ${currentCategoryMeta.priority.includes('High') ? 'bg-danger' : 'bg-success'} text-white py-1 px-2.5 mt-1 small rounded-pill fw-bold`}>
-                      {currentCategoryMeta.priority}
+                    <span className={`badge ${formData.priority === 'Critical' || formData.priority === 'Emergency' ? 'bg-danger' : formData.priority === 'High' ? 'bg-warning' : 'bg-success'} text-white py-1 px-2.5 mt-1 small rounded-pill fw-bold`}>
+                      {formData.priority || 'Normal'}
                     </span>
                   </div>
                   <div className="p-2.5 rounded-3 bg-light border border-light">
@@ -1577,7 +1578,7 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                 
                 <h3 className="fw-bold text-secondary mb-2">Complaint Submitted Successfully!</h3>
                 <p className="text-muted small mb-4 mx-auto" style={{ maxWidth: '440px' }}>
-                  Your civic issue has been registered. The system automatically routed it to the Jodhpur municipal office.
+                  Your civic issue has been registered. The system automatically routed it to the {successDetails.ulb || successDetails.district || 'Rajasthan'} municipal office.
                 </p>
 
                 {/* Details Sheet */}
@@ -1604,7 +1605,20 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
 
                 {/* Redirects */}
                 <div className="d-flex flex-wrap justify-content-center gap-3">
-                  <button onClick={() => { setTrackID(successDetails.id); setActiveSection('track'); setTrackingResult(null); }} className="btn btn-success text-white py-2.5 px-4 shadow-sm fw-bold">
+                  <button 
+                    onClick={() => {
+                      const targetId = successDetails.id;
+                      setIsSubmitted(false);
+                      setActiveSection('track');
+                      setTrackID(targetId);
+                      sessionStorage.setItem('rajcivic_pending_track_id', targetId);
+                      if (setActivePage) {
+                        setActivePage('Track Complaint');
+                      }
+                      handleTrackSearch(null, targetId);
+                    }} 
+                    className="btn btn-success text-white py-2.5 px-4 shadow-sm fw-bold"
+                  >
                     Track Complaint Status
                   </button>
                   <button onClick={() => setShowReceipt(true)} className="btn btn-outline-primary py-2.5 px-4 fw-bold">
@@ -1620,71 +1634,13 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                   </button>
                 </div>
 
-                {/* Government e-Slip print receipt overlay modal */}
-                {showReceipt && (
-                  <div className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
-                    <div className="card p-4 rounded-4 shadow-lg text-start border-0 animate-scale-up" style={{ width: '480px', background: '#fff', borderLeft: '8px solid #0f4c81' }}>
-                      <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                        <div>
-                          <strong className="text-secondary small d-block">GOVERNMENT OF RAJASTHAN</strong>
-                          <span className="text-muted text-xxs" style={{ fontSize: '0.62rem' }}>Department of Local Self Government</span>
-                        </div>
-                        <button onClick={() => setShowReceipt(false)} className="btn btn-close btn-sm"></button>
-                      </div>
-
-                      {/* Watermarked printable body */}
-                      <div className="position-relative border p-3 rounded bg-light" style={{ minHeight: '260px' }}>
-                        {/* Emblem watermark background */}
-                        <div className="position-absolute text-muted opacity-5 font-weight-black" style={{ fontSize: '3rem', top: '35%', left: '20%', transform: 'rotate(-25deg)', zIndex: 0, fontWeight: 900, userSelect: 'none', pointerEvents: 'none' }}>
-                          RAJASTHAN GOV
-                        </div>
-
-                        <div className="position-relative z-1">
-                          <h6 className="fw-bold text-secondary mb-2 text-center">OFFICIAL CIVIC COMPLAINT e-SLIP</h6>
-                          
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <span className="text-xxs text-muted" style={{ fontSize: '0.65rem' }}>Receipt No: eSLIP-{successDetails.id.split('-')[4]}</span>
-                            <span className="text-xxs text-muted" style={{ fontSize: '0.65rem' }}>Date: 26-May-2026</span>
-                          </div>
-
-                          <div className="row g-2.5 small" style={{ fontSize: '0.72rem' }}>
-                            <div className="col-6"><strong>Complaint ID:</strong><br />{successDetails.id}</div>
-                            <div className="col-6"><strong>SLA Target:</strong><br />{successDetails.sla}</div>
-                            <div className="col-6"><strong>Category:</strong><br />{successDetails.category}</div>
-                            <div className="col-6"><strong>ULB Boundary:</strong><br />{successDetails.ulb}</div>
-                            <div className="col-12"><strong>Assigned Ward:</strong><br />{successDetails.ward} (Sanitation & Drainage Team)</div>
-                          </div>
-
-                          {/* Digital sign and QR Code */}
-                          <div className="d-flex align-items-end justify-content-between border-top pt-3 mt-3">
-                            <div>
-                              <i className="bi bi-patch-check-fill text-success me-1"></i>
-                              <span className="text-xxs text-success fw-bold" style={{ fontSize: '0.65rem' }}>DIGITALLY SIGNED</span>
-                              <span className="text-muted d-block text-xxs" style={{ fontSize: '0.55rem' }}>RajCivic Verification Desk</span>
-                            </div>
-                            
-                            {/* Scannable mock QR code */}
-                            <div className="border p-1 bg-white" style={{ width: '48px', height: '48px' }}>
-                              <i className="bi bi-qr-code text-dark fs-3"></i>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button onClick={() => window.print()} className="btn btn-primary w-100 py-2.5 small mt-3 fw-bold">
-                        <i className="bi bi-printer-fill me-1"></i> Print Receipt
-                      </button>
-                    </div>
-                  </div>
-                )}
-
               </div>
             </div>
           </div>
         )}
 
-        {/* 9. Track Complaint Section & 10. Timeline Preview */}
-        {activeSection === 'track' && showOnlyTrack && (
+        {/* 9. Track Complaint Section & 10. Real Lifecycle Preview */}
+        {(activeSection === 'track' || showOnlyTrack) && !isSubmitted && (
           <div className="row justify-content-center text-start animate-slide-up">
             <div className="col-lg-10">
               <div className="card border-0 rounded-4 shadow-sm p-4 bg-white mb-4">
@@ -1693,18 +1649,40 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                   Track Existing Complaint Status
                 </h5>
 
+                {trackColdStart && (
+                  <div className="alert alert-info py-2 px-3 rounded-3 small mb-3 animate-fade-in d-flex align-items-center gap-2">
+                    <span className="spinner-border spinner-border-sm text-info" role="status"></span>
+                    <span>Server is waking up, please wait... (initial request may take a few seconds)</span>
+                  </div>
+                )}
+
+                {trackError && (
+                  <div className="alert alert-danger py-2 px-3 rounded-3 small mb-3 animate-fade-in d-flex align-items-center gap-2">
+                    <i className="bi bi-exclamation-triangle-fill text-danger"></i>
+                    <span>{trackError}</span>
+                  </div>
+                )}
+
                 <form onSubmit={handleTrackSearch} className="row g-3 align-items-end mb-4">
                   <div className="col-md-7">
-                    <label className="form-label small fw-bold text-secondary">Complaint ID *</label>
+                    <label className="form-label small fw-bold text-secondary">Complaint ID / Ticket Code *</label>
                     <input 
                       type="text" required value={trackID} 
+                      disabled={trackLoading}
                       onChange={(e) => setTrackID(e.target.value)}
                       className="form-control rc-form-control p-3 bg-light border-0 rounded-3 text-secondary" placeholder="E.g. RJCIVIC-JOD-NNJ-2026-0001" 
                     />
                   </div>
                   <div className="col-md-5">
-                    <button type="submit" className="btn rc-btn-primary w-100 py-2.5">
-                      Track Complaint Status
+                    <button type="submit" className="btn rc-btn-primary w-100 py-2.5" disabled={trackLoading || !trackID.trim()}>
+                      {trackLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                          Checking Status...
+                        </>
+                      ) : (
+                        'Track Complaint Status'
+                      )}
                     </button>
                   </div>
                 </form>
@@ -1724,25 +1702,45 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                           onClick={() => {
                             setSuccessDetails({
                               id: trackingResult.id,
-                              category: trackingResult.subcategory,
+                              title: trackingResult.title,
+                              category: trackingResult.category,
+                              subcategory: trackingResult.subcategory,
                               sla: trackingResult.slaTotal,
+                              slaDeadline: trackingResult.slaDeadline,
                               dept: trackingResult.dept,
                               ulb: trackingResult.ulb,
-                              ward: trackingResult.ward
+                              ward: trackingResult.ward,
+                              district: trackingResult.district,
+                              address: trackingResult.address,
+                              status: trackingResult.status,
+                              priority: trackingResult.priority,
+                              createdAt: trackingResult.createdAt,
+                              assignedOfficerId: trackingResult.assignedOfficerId,
+                              assignedOfficerName: trackingResult.assignedOfficerName,
+                              timeline: trackingResult.timeline
                             });
                             setShowReceipt(true);
                           }}
                           className="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-flex align-items-center gap-1 text-xxs"
                           style={{ fontSize: '0.72rem' }}
                         >
-                          <i className="bi bi-file-earmark-arrow-down-fill text-success"></i> Download e-Slip Receipt
+                          <i className="bi bi-file-earmark-arrow-down-fill text-success"></i> Download e-Slip
+                        </button>
+                        <button 
+                          onClick={() => handleTrackSearch(null, trackingResult.id)}
+                          disabled={trackLoading}
+                          className="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold d-flex align-items-center gap-1 text-xxs"
+                          style={{ fontSize: '0.72rem' }}
+                          title="Refresh data from server"
+                        >
+                          <i className={`bi bi-arrow-clockwise ${trackLoading ? 'spin' : ''}`}></i> Refresh
                         </button>
                       </div>
                       
-                      {/* Active Ticking SLA countdown box */}
-                      <span className="badge bg-danger-soft text-danger border border-danger border-opacity-10 py-2 px-3 rounded-pill fw-bold small">
+                      {/* Real SLA Countdown Box */}
+                      <span className={`badge ${slaInfo.badgeClass} border border-opacity-10 py-2 px-3 rounded-pill fw-bold small`}>
                         <i className="bi bi-clock-history me-1 animate-pulse"></i>
-                        SLA DUE IN: {formatCountdown(countdownSeconds)}
+                        {slaInfo.statusText || 'SLA Active'}
                       </span>
                     </div>
 
@@ -1755,10 +1753,11 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                           </strong>
                           <div className="d-flex flex-column gap-2 small">
                             <div><span className="text-muted">Title:</span> <strong className="text-secondary">{trackingResult.title}</strong></div>
-                            <div><span className="text-muted">Category:</span> <span className="badge bg-primary-soft text-primary rounded-pill px-2 py-0.5">{trackingResult.category} - {trackingResult.subcategory}</span></div>
-                            <div><span className="text-muted">Description:</span> <p className="text-muted text-xxs mb-0 mt-0.5" style={{ lineHeight: '1.4' }}>{trackingResult.description}</p></div>
+                            <div><span className="text-muted">Category:</span> <span className="badge bg-primary-soft text-primary rounded-pill px-2 py-0.5">{trackingResult.category}{trackingResult.subcategory ? ` • ${trackingResult.subcategory}` : ''}</span></div>
+                            <div><span className="text-muted">Description:</span> <p className="text-muted text-xxs mb-0 mt-0.5" style={{ lineHeight: '1.4' }}>{trackingResult.description || 'No description provided.'}</p></div>
                             <div><span className="text-muted">Submitted Timestamp:</span> <strong className="text-secondary">{trackingResult.date} at {trackingResult.time}</strong></div>
-                            <div><span className="text-muted">Colony Area:</span> <strong className="text-secondary">{trackingResult.ward}</strong></div>
+                            <div><span className="text-muted">District / ULB:</span> <strong className="text-secondary">{trackingResult.district || 'Rajasthan'} - {trackingResult.ulb || 'ULB'}</strong></div>
+                            <div><span className="text-muted">Ward / Address:</span> <strong className="text-secondary">{trackingResult.ward || ''} {trackingResult.address ? `(${trackingResult.address})` : ''}</strong></div>
                           </div>
                         </div>
                       </div>
@@ -1780,66 +1779,102 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                           <div className="d-flex flex-column gap-2 small">
                             <div className="d-flex justify-content-between">
                               <span className="text-muted">Expected SLA Window:</span>
-                              <strong className="text-secondary">{trackingResult.slaTotal}</strong>
+                              <strong className="text-secondary">{trackingResult.slaTotal} ({trackingResult.priority} Priority)</strong>
                             </div>
                             <div className="d-flex justify-content-between">
                               <span className="text-muted">Remaining Time:</span>
-                              <strong className="text-danger animate-pulse">{trackingResult.slaRemaining}</strong>
+                              <strong className={slaInfo.isOverdue ? 'text-danger fw-bold' : 'text-primary'}>{slaInfo.remainingText || 'Calculating...'}</strong>
                             </div>
                             <div className="d-flex justify-content-between border-top pt-2">
                               <span className="text-muted">SLA Status:</span>
-                              <span className="badge bg-success-soft text-success rounded-pill fw-bold">Active Compliance</span>
+                              <span className={`badge ${slaInfo.isComplete ? 'bg-success-soft text-success' : slaInfo.isOverdue ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary'} rounded-pill fw-bold`}>
+                                {slaInfo.label}
+                              </span>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* C. Operational Timeline Panel */}
+                    {/* C. Operational Timeline Panel (4 Real Stages) */}
                     <div className="card border-0 p-3 bg-light rounded-3 mb-4 text-start">
-                      <strong className="text-secondary small d-block mb-3.5 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
-                        <i className="bi bi-clock-history text-primary"></i> C. Complaint Operational Lifecycle (11 Stages)
-                      </strong>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <strong className="text-secondary small text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
+                          <i className="bi bi-clock-history text-primary"></i> C. Complaint Operational Lifecycle (4 Stages)
+                        </strong>
+                        {((trackingResult.status === 'Reopened') || (trackingResult.timeline && trackingResult.timeline.some(t => t.status === 'Reopened'))) && (
+                          <span className="badge bg-warning text-dark fw-bold small">
+                            <i className="bi bi-arrow-counterclockwise me-1"></i> Reopened Case
+                          </span>
+                        )}
+                      </div>
                       
                       <div className="row g-2 text-center">
                         {stages.map((st, idx) => {
-                          const isActive = idx <= trackingResult.activeIdx;
-                          const isCurrent = idx === trackingResult.activeIdx;
+                          const currentStageIdx = trackingResult.status === 'Closed' ? 3
+                            : trackingResult.status === 'Resolved' ? 2
+                            : (trackingResult.status === 'InProgress' || trackingResult.status === 'In Progress') ? 1
+                            : 0; // Submitted
+                          const isCompleted = idx < currentStageIdx;
+                          const isCurrent = idx === currentStageIdx;
                           
-                          // Stage colors: Green completed, Blue current, Gray pending
                           const circleStyle = isCurrent 
                             ? 'bg-primary text-white pulse-glow border-primary' 
-                            : isActive 
+                            : isCompleted 
                             ? 'bg-success text-white border-success' 
                             : 'bg-white text-muted border';
 
                           const textClass = isCurrent 
                             ? 'text-primary fw-bold' 
-                            : isActive 
+                            : isCompleted 
                             ? 'text-success fw-semibold' 
                             : 'text-muted';
 
+                          // Find timestamp from timeline
+                          const stageTime = (() => {
+                            if (!trackingResult.timeline || trackingResult.timeline.length === 0) {
+                              if (st.key === 'Submitted' && trackingResult.createdAt) return new Date(trackingResult.createdAt).toLocaleDateString();
+                              return '';
+                            }
+                            const match = trackingResult.timeline.find(t => {
+                              if (st.key === 'Submitted') return t.status === 'Submitted';
+                              if (st.key === 'InProgress') return t.status === 'InProgress' || t.status === 'In Progress';
+                              if (st.key === 'Resolved') return t.status === 'Resolved';
+                              if (st.key === 'Closed') return t.status === 'Closed';
+                              return false;
+                            });
+                            return match && match.timestamp ? new Date(match.timestamp).toLocaleDateString() : '';
+                          })();
+
                           return (
-                            <div className="col-6 col-md" key={idx}>
+                            <div className="col-6 col-md-3" key={idx}>
                               <div className="d-flex flex-column align-items-center">
                                 <div 
                                   className={`rounded-circle d-flex align-items-center justify-content-center shadow-sm fw-bold ${circleStyle}`}
-                                  style={{ width: '28px', height: '28px', fontSize: '0.72rem', zIndex: 2 }}
+                                  style={{ width: '32px', height: '32px', fontSize: '0.75rem', zIndex: 2 }}
                                 >
-                                  {isActive && !isCurrent ? <i className="bi bi-check-lg" style={{ fontSize: '0.7rem' }}></i> : idx + 1}
+                                  {isCompleted ? <i className="bi bi-check-lg" style={{ fontSize: '0.8rem' }}></i> : idx + 1}
                                 </div>
-                                <span className={`mt-1.5 d-block text-xxs ${textClass}`} style={{ fontSize: '0.6rem', lineHeight: '1.2' }}>{st.title}</span>
+                                <span className={`mt-1.5 d-block text-xxs ${textClass}`} style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>{st.title}</span>
+                                {stageTime && <span className="text-muted text-xxs mt-0.5" style={{ fontSize: '0.6rem' }}>{stageTime}</span>}
                               </div>
                             </div>
                           );
                         })}
                       </div>
+
+                      {((trackingResult.status === 'Reopened') || (trackingResult.timeline && trackingResult.timeline.some(t => t.status === 'Reopened'))) && (
+                        <div className="alert alert-warning py-1.5 px-3 rounded-3 small mt-3 mb-0 d-flex align-items-center gap-2">
+                          <i className="bi bi-arrow-counterclockwise text-danger fw-bold"></i>
+                          <span><strong>Case Reopened:</strong> Citizen requested additional inspection / corrective action.</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* D. Department Assignment Panel */}
+                    {/* D & E Assigned Administration and G. Municipal Incident Location */}
                     <div className="row g-3.5 text-start mb-4">
                       
-                      {/* D & E details */}
+                      {/* Assigned Administration */}
                       <div className="col-md-6">
                         <div className="card border-0 p-3 bg-white border border-light rounded-3 h-100 shadow-xxs">
                           <strong className="text-secondary small d-block mb-3 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
@@ -1852,8 +1887,8 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                                 <i className="bi bi-building"></i>
                               </div>
                               <div>
-                                <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Jurisdiction ULB</span>
-                                <strong className="text-secondary">{trackingResult.ulb}</strong>
+                                <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Jurisdiction ULB & Department</span>
+                                <strong className="text-secondary">{trackingResult.ulb || 'Rajasthan ULB'} • {trackingResult.departmentName || trackingResult.dept}</strong>
                               </div>
                             </div>
 
@@ -1862,32 +1897,58 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                                 <i className="bi bi-person-fill-check"></i>
                               </div>
                               <div>
-                                <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Supervising Officer</span>
-                                <strong className="text-secondary">{trackingResult.officer}</strong>
+                                <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>Assigned Officer</span>
+                                <strong className="text-secondary d-block">
+                                  {trackingResult.assignedOfficerName || `Not assigned yet — handled by ${trackingResult.departmentName || trackingResult.dept || 'Department'}`}
+                                </strong>
+                                {(() => {
+                                  const latestTimeline = trackingResult.timeline && trackingResult.timeline.length > 0
+                                    ? trackingResult.timeline[trackingResult.timeline.length - 1]
+                                    : null;
+                                  if (latestTimeline) {
+                                    return (
+                                      <span className="text-muted text-xxs d-block" style={{ fontSize: '0.6rem' }}>
+                                        Last updated by {latestTimeline.updatedBy || 'Staff'} on {latestTimeline.timestamp ? new Date(latestTimeline.timestamp).toLocaleString() : 'recently'}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* G. Location Map Canvas */}
+                      {/* G. Municipal Incident Location & GIS Map Preview */}
                       <div className="col-md-6">
-                        <div className="card border-0 p-3 bg-dark rounded-3 h-100 text-white shadow-xxs position-relative overflow-hidden" style={{ minHeight: '210px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-                          <div className="position-absolute w-100 h-100 top-0 start-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '12px 12px' }}></div>
-                          
-                          {/* Map overlays */}
-                          <div className="position-absolute bg-success rounded-circle animate-pulse" style={{ width: '18px', height: '18px', top: '48%', left: '46%', filter: 'blur(1px)', opacity: 0.8 }}>
-                            <i className="bi bi-geo-alt-fill text-white small position-absolute top-50 start-50 translate-middle" style={{ fontSize: '0.55rem' }}></i>
+                        <div className="card border-0 p-3 bg-white border border-light rounded-3 h-100 shadow-xxs">
+                          <strong className="text-secondary small d-block mb-2 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
+                            <i className="bi bi-geo-alt-fill text-danger"></i> G. Municipal Incident Location &amp; GIS Map
+                          </strong>
+                          {trackingResult.latitude && trackingResult.longitude ? (
+                            <div className="badge bg-primary-soft text-primary mb-2 align-self-start fw-semibold" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-geo-alt-fill me-1"></i> Exact Incident Pin ({Number(trackingResult.latitude).toFixed(4)}, {Number(trackingResult.longitude).toFixed(4)})
+                            </div>
+                          ) : (
+                            <div className="badge bg-warning-soft text-warning mb-2 align-self-start fw-semibold" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-info-circle-fill me-1"></i> Approximate location (district centre)
+                            </div>
+                          )}
+                          <div className="d-flex flex-column gap-2 small">
+                            <div><span className="text-muted">District:</span> <strong className="text-secondary">{trackingResult.district || 'Rajasthan'}</strong></div>
+                            <div><span className="text-muted">ULB / City:</span> <strong className="text-secondary">{trackingResult.ulb || '—'}</strong></div>
+                            <div><span className="text-muted">Ward / Colony:</span> <strong className="text-secondary">{trackingResult.ward || trackingResult.areaColony || '—'}</strong></div>
+                            <div><span className="text-muted">Registered Address:</span> <p className="text-secondary small mb-0 mt-0.5">{trackingResult.address || trackingResult.fullAddress || 'Site address recorded upon lodgement.'}</p></div>
                           </div>
-                          
-                          <span className="badge bg-dark bg-opacity-75 text-success border border-success border-opacity-30 position-absolute top-2 left-2 px-2 py-0.5" style={{ fontSize: '0.58rem', letterSpacing: '0.05em' }}>
-                            <i className="bi bi-map-fill me-1"></i> G. OpenStreetMap Leaflet GIS Preview
-                          </span>
-
-                          <div className="d-flex flex-column align-items-center justify-content-center h-100" style={{ zIndex: 3, position: 'relative' }}>
-                            <i className="bi bi-compass text-success display-6 opacity-35 mb-1.5"></i>
-                            <h6 className="fw-bold m-0" style={{ fontSize: '0.78rem' }}>Plot 42, Shastri Nagar, Ward 12</h6>
-                            <span className="text-muted" style={{ fontSize: '0.62rem' }}>GIS Layer Matched with Centroid coordinates</span>
+                          <div className="mt-3 rounded-3 overflow-hidden border">
+                            <MapPicker
+                              center={trackingResult.latitude && trackingResult.longitude ? [trackingResult.latitude, trackingResult.longitude] : [26.9124, 75.7873]}
+                              zoom={trackingResult.latitude && trackingResult.longitude ? 14 : 11}
+                              markerPosition={trackingResult.latitude && trackingResult.longitude ? [trackingResult.latitude, trackingResult.longitude] : null}
+                              onLocationSelect={() => {}}
+                              height="170px"
+                            />
                           </div>
                         </div>
                       </div>
@@ -1897,130 +1958,147 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                     {/* H. Proof Section & I. Officer Remarks */}
                     <div className="row g-3.5 text-start mb-4">
                       
-                      {/* H. Proof Gallery */}
+                      {/* H. Physical Ground Proof Verification */}
                       <div className="col-md-7">
                         <div className="card border-0 p-3 bg-light rounded-3 h-100 shadow-xxs">
                           <strong className="text-secondary small d-block mb-3.5 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
                             <i className="bi bi-images text-primary"></i> H. Physical Ground Proof Verification
                           </strong>
                           
-                          <div className="row g-2.5">
-                            <div className="col-6">
-                              <div className="bg-dark rounded p-2 text-center text-white position-relative overflow-hidden" style={{ minHeight: '110px', background: 'linear-gradient(180deg, #374151 0%, #111827 100%)' }}>
-                                <span className="text-white d-block fw-bold mb-1.5 position-relative z-1" style={{ fontSize: '0.58rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>BEFORE REPAIR</span>
-                                {trackingResult.beforeProof ? (
-                                  <img src={trackingResult.beforeProof} alt="Before Repair Proof" className="position-absolute top-0 start-0 w-100 h-100 object-fit-cover opacity-75" />
-                                ) : (
-                                  <>
-                                    <i className="bi bi-camera-fill text-danger fs-3 opacity-30 mb-1 d-block position-relative z-1"></i>
-                                    <span className="text-muted d-block text-xxs position-relative z-1" style={{ fontSize: '0.55rem' }}>Geotagged Photo Lock</span>
-                                  </>
-                                )}
-                              </div>
+                          {lazyPhotoLoading ? (
+                            <div className="p-4 text-center text-muted small">
+                              <span className="spinner-border spinner-border-sm me-2 text-primary" role="status"></span>
+                              Loading ground photo evidence...
                             </div>
-                            <div className="col-6">
-                              <div className="bg-dark rounded p-2 text-center text-white position-relative overflow-hidden" style={{ minHeight: '110px', background: 'linear-gradient(180deg, #1f2937 0%, #030712 100%)' }}>
-                                <span className="text-white d-block fw-bold mb-1.5 position-relative z-1" style={{ fontSize: '0.58rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>AFTER REPAIR</span>
-                                {trackingResult.afterProof ? (
-                                  <img src={trackingResult.afterProof} alt="After Repair Proof" className="position-absolute top-0 start-0 w-100 h-100 object-fit-cover opacity-75" />
-                                ) : (
-                                  <>
-                                    <i className="bi bi-patch-check-fill text-success fs-3 opacity-35 mb-1 d-block position-relative z-1"></i>
-                                    <span className="text-muted d-block text-xxs position-relative z-1" style={{ fontSize: '0.55rem' }}>Resolution Proof Upload</span>
-                                  </>
-                                )}
-                              </div>
+                          ) : lazyPhoto ? (
+                            <div className="bg-dark rounded p-2 text-center text-white position-relative overflow-hidden" style={{ minHeight: '160px' }}>
+                              <img src={lazyPhoto} alt="Grievance Ground Proof" className="w-100 rounded object-fit-contain" style={{ maxHeight: '240px' }} />
+                              <span className="text-white d-block small mt-1">Submitted Incident Photo</span>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="p-4 text-center text-muted small bg-white rounded-3 border">
+                              <i className="bi bi-camera-slash fs-3 text-secondary opacity-50 d-block mb-1"></i>
+                              <span>No ground photo attached to this grievance ticket.</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* I. Officer Remarks */}
+                      {/* I. Officer Remarks & Logs */}
                       <div className="col-md-5">
                         <div className="card border-0 p-3 bg-white border border-light rounded-3 h-100 shadow-xxs">
                           <strong className="text-secondary small d-block mb-2 text-uppercase font-semibold" style={{ letterSpacing: '0.05em', fontSize: '0.68rem' }}>
-                            <i className="bi bi-chat-left-dots text-primary"></i> I. Officer Remarks & Logs
+                            <i className="bi bi-chat-left-dots text-primary"></i> I. Officer Remarks & Audit Log
                           </strong>
-                          <div className="bg-light p-2.5 rounded-3 border border-light" style={{ minHeight: '110px' }}>
-                            <span className="text-muted d-block text-xxs" style={{ fontSize: '0.6rem' }}>PUBLIC REMARKS</span>
+                          <div className="bg-light p-2.5 rounded-3 border border-light mb-3">
+                            <span className="text-muted d-block text-xxs" style={{ fontSize: '0.6rem' }}>LATEST REMARKS</span>
                             <p className="text-secondary small fw-semibold mt-1 mb-0" style={{ lineHeight: '1.4', fontSize: '0.72rem' }}>
-                              "{trackingResult.officerRemarks}"
+                              "{trackingResult.remarks || 'No officer remarks logged yet.'}"
                             </p>
                           </div>
+                          {trackingResult.timeline && trackingResult.timeline.length > 0 && (
+                            <div className="overflow-auto" style={{ maxHeight: '180px' }}>
+                              <span className="text-muted d-block text-xxs mb-1" style={{ fontSize: '0.6rem' }}>ACTIVITY TIMELINE</span>
+                              <ul className="list-unstyled mb-0 small">
+                                {trackingResult.timeline.map((item, idx) => (
+                                  <li key={idx} className="border-bottom pb-1 mb-1" style={{ fontSize: '0.7rem' }}>
+                                    <span className="badge bg-secondary-soft text-secondary me-1">{item.status}</span>
+                                    <span className="text-muted">{item.description}</span>
+                                    <span className="text-muted d-block text-xxs">{item.updatedBy || 'Staff'} • {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                     </div>
 
                     {/* J. Citizen Feedback / Reopen Complaint Option */}
-                    <div className="card border-0 p-4 shadow-sm bg-white rounded-4 border border-success border-opacity-10 text-start" style={{ background: 'linear-gradient(180deg, rgba(240, 253, 244, 0.4) 0%, rgba(255, 255, 255, 1) 100%)' }}>
-                      <div className="d-flex align-items-center gap-2 mb-3">
-                        <div className="bg-success text-white rounded-circle p-1.5 d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
-                          <i className="bi bi-star-fill text-warning"></i>
-                        </div>
-                        <h6 className="fw-bold text-secondary m-0">J. Citizen Feedback & Case Closure Desk</h6>
-                      </div>
+                    {(() => {
+                      const isResolvedOrClosed = trackingResult.status === 'Resolved' || trackingResult.status === 'Closed';
+                      const isOwner = authenticatedUser && (
+                        (trackingResult.citizenId && String(authenticatedUser.id) === String(trackingResult.citizenId)) ||
+                        (authenticatedUser.email && trackingResult.citizenEmail && authenticatedUser.email.toLowerCase() === trackingResult.citizenEmail.toLowerCase())
+                      );
+                      if (!isResolvedOrClosed || !isOwner) {
+                        return null;
+                      }
 
-                      {feedbackSubmitted ? (
-                        <div className="alert alert-success border-0 p-3 rounded-3 mb-0 animate-scale-up text-center">
-                          <i className="bi bi-patch-check-fill text-success fs-4 d-block mb-1"></i>
-                          <strong className="text-secondary small d-block">Feedback Locked Successfully!</strong>
-                          <span className="text-muted d-block text-xxs" style={{ fontSize: '0.65rem' }}>Thank you! Your feedback closes this grievance ticket permanently in the Rajasthan Municipal database.</span>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-muted small mb-3">
-                            Municipal records show the field crew has successfully completed work on this issue. Are you fully satisfied with the resolution?
-                          </p>
-
-                          {/* Star Selector */}
+                      return (
+                        <div className="card border-0 p-4 shadow-sm bg-white rounded-4 border border-success border-opacity-10 text-start" style={{ background: 'linear-gradient(180deg, rgba(240, 253, 244, 0.4) 0%, rgba(255, 255, 255, 1) 100%)' }}>
                           <div className="d-flex align-items-center gap-2 mb-3">
-                            <span className="text-muted small">Your Rating:</span>
-                            <div className="d-flex gap-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <i 
-                                  key={star}
-                                  onClick={() => setFeedbackRating(star)}
-                                  className={`bi bi-star-fill fs-5 cursor-pointer transition-all ${star <= feedbackRating ? 'text-warning' : 'text-muted'}`}
-                                  style={{ cursor: 'pointer' }}
-                                ></i>
-                              ))}
+                            <div className="bg-success text-white rounded-circle p-1.5 d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+                              <i className="bi bi-star-fill text-warning"></i>
                             </div>
-                            <span className="badge bg-warning-soft text-dark small fw-bold ms-2">{feedbackRating} Stars</span>
+                            <h6 className="fw-bold text-secondary m-0">J. Citizen Feedback & Case Closure Desk</h6>
                           </div>
 
-                          <div className="mb-3">
-                            <label className="form-label text-secondary small fw-bold">Satisfaction Comments / Feedback (Optional)</label>
-                            <input 
-                              type="text" 
-                              placeholder="e.g. Excellent work done! Highly satisfied."
-                              className="form-control form-control-sm border py-2 px-3 rounded-3"
-                              style={{ fontSize: '0.8rem' }}
-                              value={feedbackComment}
-                              onChange={(e) => setFeedbackComment(e.target.value)}
-                            />
-                          </div>
+                          {feedbackSubmitted ? (
+                            <div className="alert alert-success border-0 p-3 rounded-3 mb-0 animate-scale-up text-center">
+                              <i className="bi bi-patch-check-fill text-success fs-4 d-block mb-1"></i>
+                              <strong className="text-secondary small d-block">Feedback Recorded Successfully!</strong>
+                              <span className="text-muted d-block text-xxs" style={{ fontSize: '0.65rem' }}>
+                                Rating: {feedbackRating} / 5 Stars {feedbackComment ? `— "${feedbackComment}"` : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-muted small mb-3">
+                                Municipal records show work on this issue is completed. Please rate your satisfaction:
+                              </p>
 
-                          <div className="d-flex flex-wrap gap-2">
-                            <button 
-                              onClick={handleFeedbackSubmit}
-                              className="btn btn-success text-white btn-sm px-4 rounded-pill fw-bold border-0 bg-success hover-success-dark"
-                            >
-                              <i className="bi bi-shield-fill-check me-1"></i> Yes, Close Complaint
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setReopenData((prev) => ({ ...prev, id: trackingResult.id }));
-                                setActiveSection('reopen');
-                              }}
-                              className="btn btn-danger text-white btn-sm px-4 rounded-pill fw-bold border-0 bg-danger hover-danger-dark"
-                            >
-                              <i className="bi bi-arrow-counterclockwise me-1"></i> No, Reopen Complaint
-                            </button>
-                          </div>
+                              {/* Star Selector */}
+                              <div className="d-flex align-items-center gap-2 mb-3">
+                                <span className="text-muted small">Your Rating:</span>
+                                <div className="d-flex gap-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <i 
+                                      key={star}
+                                      onClick={() => setFeedbackRating(star)}
+                                      className={`bi bi-star-fill fs-5 cursor-pointer transition-all ${star <= feedbackRating ? 'text-warning' : 'text-muted'}`}
+                                      style={{ cursor: 'pointer' }}
+                                    ></i>
+                                  ))}
+                                </div>
+                                <span className="badge bg-warning-soft text-dark small fw-bold ms-2">{feedbackRating} Stars</span>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="form-label text-secondary small fw-bold">Satisfaction Comments / Feedback (Optional)</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="e.g. Excellent work done! Highly satisfied."
+                                  className="form-control form-control-sm border py-2 px-3 rounded-3"
+                                  style={{ fontSize: '0.8rem' }}
+                                  value={feedbackComment}
+                                  onChange={(e) => setFeedbackComment(e.target.value)}
+                                />
+                              </div>
+
+                              <div className="d-flex flex-wrap gap-2">
+                                <button 
+                                  onClick={handleFeedbackSubmit}
+                                  className="btn btn-success text-white btn-sm px-4 rounded-pill fw-bold border-0 bg-success hover-success-dark"
+                                >
+                                  <i className="bi bi-shield-fill-check me-1"></i> Submit Citizen Feedback
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setReopenData((prev) => ({ ...prev, id: trackingResult.id }));
+                                    setActiveSection('reopen');
+                                  }}
+                                  className="btn btn-outline-danger btn-sm px-4 rounded-pill fw-bold"
+                                >
+                                  <i className="bi bi-arrow-counterclockwise me-1"></i> Request Reopen
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                   </div>
                 )}
@@ -2103,6 +2181,81 @@ export default function ComplaintCenter({ setActivePage, showOnlyTrack = false, 
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Government e-Slip print receipt overlay modal */}
+        {showReceipt && successDetails && (
+          <div className="printable-slip-overlay position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center p-3" style={{ zIndex: 1050 }}>
+            <div className="printable-slip-card card p-4 rounded-4 shadow-lg text-start border-0 animate-scale-up" style={{ width: '560px', maxWidth: '100%', background: '#fff', borderLeft: '8px solid #0f4c81' }}>
+              <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <div>
+                  <strong className="text-secondary small d-block">GOVERNMENT OF RAJASTHAN</strong>
+                  <span className="text-muted text-xxs" style={{ fontSize: '0.62rem' }}>Department of Local Self Government • RajCivic Portal</span>
+                </div>
+                <button onClick={() => setShowReceipt(false)} className="btn btn-close btn-sm no-print" aria-label="Close"></button>
+              </div>
+
+              {/* Printable body */}
+              <div className="position-relative border p-3 rounded bg-light" style={{ minHeight: '260px' }}>
+                <div className="position-relative z-1">
+                  <h6 className="fw-bold text-secondary mb-2 text-center">OFFICIAL CIVIC COMPLAINT e-SLIP</h6>
+                  
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-xxs text-muted" style={{ fontSize: '0.65rem' }}>Receipt: eSLIP-{successDetails.id}</span>
+                    <span className="text-xxs text-muted" style={{ fontSize: '0.65rem' }}>Date: {new Date().toLocaleDateString('en-IN')}</span>
+                  </div>
+
+                  <div className="row g-2 small border-top pt-2" style={{ fontSize: '0.75rem' }}>
+                    <div className="col-6"><strong>Complaint ID:</strong><br /><span className="text-primary fw-bold">{successDetails.id}</span></div>
+                    <div className="col-6"><strong>Current Status:</strong><br /><span className="badge bg-success-soft text-success">{successDetails.status || 'Submitted'}</span></div>
+                    <div className="col-6"><strong>Subject / Title:</strong><br />{successDetails.title || 'Civic Issue'}</div>
+                    <div className="col-6"><strong>Priority:</strong><br />{successDetails.priority || 'Normal'}</div>
+                    <div className="col-6"><strong>Category:</strong><br />{successDetails.category || 'General'}</div>
+                    <div className="col-6"><strong>Department:</strong><br />{successDetails.dept || 'Local Self Government'}</div>
+                    <div className="col-6"><strong>District / ULB:</strong><br />{successDetails.district || 'Rajasthan'} - {successDetails.ulb || 'ULB'}</div>
+                    <div className="col-6"><strong>Ward / Landmark:</strong><br />{successDetails.ward || ''} {successDetails.address ? `(${successDetails.address})` : ''}</div>
+                    <div className="col-6"><strong>Assigned Officer:</strong><br /><span>{successDetails.assignedOfficerName || 'Not assigned yet'}</span></div>
+                    <div className="col-6"><strong>Submitted On:</strong><br />{successDetails.createdAt ? new Date(successDetails.createdAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN')}</div>
+                    <div className="col-6"><strong>SLA Target:</strong><br /><span className="text-danger fw-bold">{successDetails.slaDeadline ? new Date(successDetails.slaDeadline).toLocaleString('en-IN') : (successDetails.sla || '48 Hours')}</span></div>
+                  </div>
+
+                  {successDetails.timeline && successDetails.timeline.length > 0 && (
+                    <div className="mt-2 border-top pt-2">
+                      <strong className="text-xxs text-secondary text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Status Log:</strong>
+                      <div className="small" style={{ fontSize: '0.68rem' }}>
+                        {successDetails.timeline.slice(-3).map((t, idx) => (
+                          <div key={idx} className="text-muted">
+                            • <strong>{t.status}</strong>: {t.description || t.title} ({t.updatedBy || 'Staff'})
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Digital sign and QR Code */}
+                  <div className="d-flex align-items-end justify-content-between border-top pt-2 mt-3">
+                    <div>
+                      <i className="bi bi-patch-check-fill text-success me-1"></i>
+                      <span className="text-xxs text-success fw-bold" style={{ fontSize: '0.65rem' }}>OFFICIALLY VERIFIED</span>
+                      <span className="text-muted d-block text-xxs" style={{ fontSize: '0.55rem' }}>Government of Rajasthan Civic Portal</span>
+                    </div>
+                    <div className="border p-1 bg-white" style={{ width: '42px', height: '42px' }}>
+                      <i className="bi bi-qr-code text-dark fs-4"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="d-flex gap-2 mt-3 no-print">
+                <button onClick={() => window.print()} className="btn btn-primary flex-grow-1 py-2 small fw-bold">
+                  <i className="bi bi-printer-fill me-1"></i> Print / Save as PDF
+                </button>
+                <button onClick={() => setShowReceipt(false)} className="btn btn-outline-secondary py-2 small fw-bold">
+                  Close
+                </button>
               </div>
             </div>
           </div>

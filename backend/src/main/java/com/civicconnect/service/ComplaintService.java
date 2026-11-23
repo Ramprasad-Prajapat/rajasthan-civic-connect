@@ -12,6 +12,7 @@ import com.civicconnect.exception.ApiException;
 import com.civicconnect.repository.ComplaintRepository;
 import com.civicconnect.repository.ComplaintTimelineRepository;
 import com.civicconnect.repository.DepartmentRepository;
+import com.civicconnect.repository.UserRepository;
 import com.civicconnect.util.ComplaintCodeGenerator;
 import com.civicconnect.util.Constants;
 import com.civicconnect.util.DepartmentMapper;
@@ -33,6 +34,7 @@ public class ComplaintService {
     private final ComplaintRepository complaintRepository;
     private final ComplaintTimelineRepository timelineRepository;
     private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
     private final ComplaintMediaService mediaService;
     private final NotificationService notificationService;
     private final ComplaintDraftService draftService;
@@ -41,6 +43,7 @@ public class ComplaintService {
             ComplaintRepository complaintRepository,
             ComplaintTimelineRepository timelineRepository,
             DepartmentRepository departmentRepository,
+            UserRepository userRepository,
             ComplaintMediaService mediaService,
             NotificationService notificationService,
             ComplaintDraftService draftService
@@ -48,6 +51,7 @@ public class ComplaintService {
         this.complaintRepository = complaintRepository;
         this.timelineRepository = timelineRepository;
         this.departmentRepository = departmentRepository;
+        this.userRepository = userRepository;
         this.mediaService = mediaService;
         this.notificationService = notificationService;
         this.draftService = draftService;
@@ -61,8 +65,9 @@ public class ComplaintService {
         String mappedDeptName = DepartmentMapper.mapCategoryToDepartment(request.category());
         Department department = resolveDepartment(mappedDeptName);
 
-        SlaCalculator.SlaResult sla = SlaCalculator.calculateSla(priority, false);
-        String prefix = ComplaintCodeGenerator.generatePrefix(request.district(), request.ulbName(), false);
+        boolean isEmergency = Boolean.TRUE.equals(request.isEmergency()) || "Emergency".equalsIgnoreCase(priority);
+        SlaCalculator.SlaResult sla = SlaCalculator.calculateSla(priority, isEmergency);
+        String prefix = ComplaintCodeGenerator.generatePrefix(request.district(), request.ulbName(), isEmergency);
 
         Complaint complaint = new Complaint();
         complaint.setComplaintCode("TMP-" + UUID.randomUUID());
@@ -197,8 +202,34 @@ public class ComplaintService {
                 .map(TimelineResponse::fromEntity)
                 .toList();
 
+        return ComplaintResponse.fromEntity(complaint, timeline);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getComplaintPhoto(String idOrCode, User caller) {
+        Complaint complaint = findByIdOrCode(idOrCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Complaint not found"));
+
+        if (!Constants.ROLE_ADMIN.equalsIgnoreCase(caller.getRole())) {
+            if (Constants.ROLE_OFFICER.equalsIgnoreCase(caller.getRole()) || Constants.ROLE_OFFICER_ALT.equalsIgnoreCase(caller.getRole())) {
+                if (caller.getDepartmentId() == null || !caller.getDepartmentId().equals(complaint.getDepartmentId())) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Access forbidden: cannot view complaint photo of another department");
+                }
+            } else {
+                if (!caller.getId().equals(complaint.getCitizenId())) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Access forbidden: cannot view photo of another user's complaint");
+                }
+            }
+        }
+
         ComplaintMediaService.MediaBundle media = mediaService.extractMedia(complaint.getId());
-        return ComplaintResponse.fromEntityWithMedia(complaint, timeline, media.photo(), media.beforePhotos(), media.afterPhotos());
+        String photo = media.photo() != null ? media.photo() : "";
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("hasPhoto", !photo.isBlank());
+        resp.put("photo", photo);
+        resp.put("beforePhotos", media.beforePhotos());
+        resp.put("afterPhotos", media.afterPhotos());
+        return resp;
     }
 
     @Transactional
@@ -289,6 +320,16 @@ public class ComplaintService {
         complaint.setDepartmentId(targetDept.getId());
         complaint.setDepartmentName(targetDept.getName());
 
+        // Clear assigned officer if their department no longer matches
+        if (complaint.getAssignedOfficerId() != null) {
+            userRepository.findById(complaint.getAssignedOfficerId()).ifPresent(officer -> {
+                if (officer.getDepartmentId() != null && !officer.getDepartmentId().equals(targetDept.getId())) {
+                    complaint.setAssignedOfficerId(null);
+                    complaint.setAssignedOfficerName(null);
+                }
+            });
+        }
+
         Complaint saved = complaintRepository.save(complaint);
 
         String remark = "Department reassigned from " + oldDeptName + " to " + targetDept.getName() + " by Admin";
@@ -318,11 +359,91 @@ public class ComplaintService {
         return ComplaintResponse.fromEntity(saved, timeline);
     }
 
+    @Transactional
+    public ComplaintResponse assignOfficer(String idOrCode, Long officerId, User admin) {
+        if (admin == null || !Constants.ROLE_ADMIN.equalsIgnoreCase(admin.getRole())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only administrators may assign officers to complaints");
+        }
+
+        Complaint complaint = findByIdOrCode(idOrCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Complaint not found"));
+
+        if (officerId == null) {
+            complaint.setAssignedOfficerId(null);
+            complaint.setAssignedOfficerName(null);
+            Complaint saved = complaintRepository.save(complaint);
+
+            ComplaintTimeline timelineEvent = new ComplaintTimeline(
+                    saved.getId(),
+                    saved.getStatus(),
+                    "Officer Unassigned",
+                    "Assigned officer removed by Admin",
+                    admin.getName() != null ? admin.getName() : "Administrator",
+                    admin.getRole()
+            );
+            timelineRepository.save(timelineEvent);
+
+            List<TimelineResponse> timeline = timelineRepository.findByComplaintIdOrderByCreatedAtAsc(saved.getId())
+                    .stream()
+                    .map(TimelineResponse::fromEntity)
+                    .toList();
+
+            return ComplaintResponse.fromEntity(saved, timeline);
+        }
+
+        User officer = userRepository.findById(officerId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Officer not found"));
+
+        if (!Constants.ROLE_OFFICER.equalsIgnoreCase(officer.getRole()) &&
+            !Constants.ROLE_OFFICER_ALT.equalsIgnoreCase(officer.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selected user is not an officer");
+        }
+
+        if (officer.getDepartmentId() != null && complaint.getDepartmentId() != null &&
+                !officer.getDepartmentId().equals(complaint.getDepartmentId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Officer does not belong to the complaint's department");
+        }
+
+        complaint.setAssignedOfficerId(officer.getId());
+        complaint.setAssignedOfficerName(officer.getName());
+        Complaint saved = complaintRepository.save(complaint);
+
+        String remark = "Assigned to " + officer.getName() + " (" + (officer.getRole() != null ? officer.getRole() : "Officer") + ") by Admin";
+        ComplaintTimeline timelineEvent = new ComplaintTimeline(
+                saved.getId(),
+                saved.getStatus(),
+                "Officer Assigned",
+                remark,
+                admin.getName() != null ? admin.getName() : "Administrator",
+                admin.getRole()
+        );
+        timelineRepository.save(timelineEvent);
+
+        notificationService.createNotification(
+                officer.getId(),
+                "New Grievance Assigned: " + saved.getComplaintCode(),
+                "Grievance " + saved.getComplaintCode() + " has been assigned to you.",
+                "COMPLAINT",
+                saved.getComplaintCode()
+        );
+
+        List<TimelineResponse> timeline = timelineRepository.findByComplaintIdOrderByCreatedAtAsc(saved.getId())
+                .stream()
+                .map(TimelineResponse::fromEntity)
+                .toList();
+
+        return ComplaintResponse.fromEntity(saved, timeline);
+    }
+
     public Optional<Complaint> findByIdOrCode(String idOrCode) {
-        Optional<Complaint> byCode = complaintRepository.findByComplaintCode(idOrCode);
+        if (idOrCode == null || idOrCode.isBlank()) return Optional.empty();
+        String trimmed = idOrCode.trim();
+        Optional<Complaint> byCode = complaintRepository.findByComplaintCode(trimmed);
         if (byCode.isPresent()) return byCode;
+        Optional<Complaint> byCodeUpper = complaintRepository.findByComplaintCode(trimmed.toUpperCase());
+        if (byCodeUpper.isPresent()) return byCodeUpper;
         try {
-            Long numericId = Long.parseLong(idOrCode);
+            Long numericId = Long.parseLong(trimmed);
             return complaintRepository.findById(numericId);
         } catch (NumberFormatException e) {
             return Optional.empty();

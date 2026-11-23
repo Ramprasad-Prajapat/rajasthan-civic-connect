@@ -8,6 +8,7 @@ import RolePortals from './components/RolePortals';
 import TrustTransparency from './components/TrustTransparency';
 import Footer from './components/Footer';
 import { SkeletonPage } from './components/SkeletonLoaders';
+import { checkHealth, getMyProfile } from './apiService';
 import './App.css';
 
 // Lazy-loaded components
@@ -27,6 +28,11 @@ function App() {
     sessionStorage.setItem('rajcivic_active_page', activePage);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activePage]);
+
+  // Non-blocking warm-up ping to wake the backend early (R18)
+  React.useEffect(() => {
+    checkHealth();
+  }, []);
 
   // Auth view mode for Login/Register component ('login' | 'register')
   const [authViewMode, setAuthViewMode] = useState('login');
@@ -88,17 +94,15 @@ function App() {
   // Sync user profile with backend
   React.useEffect(() => {
     if (authenticatedUser && (authenticatedUser.id || authenticatedUser.uid || authenticatedUser.email)) {
-      import('./apiService').then(({ getMyProfile }) => {
-        getMyProfile().then(profile => {
-          if (profile) {
-            const merged = { ...authenticatedUser, ...profile };
-            if (JSON.stringify(merged) !== JSON.stringify(authenticatedUser)) {
-              setAuthenticatedUser(merged);
-              localStorage.setItem('rajcivic_user', JSON.stringify(merged));
-            }
+      getMyProfile().then(profile => {
+        if (profile) {
+          const merged = { ...authenticatedUser, ...profile };
+          if (JSON.stringify(merged) !== JSON.stringify(authenticatedUser)) {
+            setAuthenticatedUser(merged);
+            localStorage.setItem('rajcivic_user', JSON.stringify(merged));
           }
-        }).catch(() => {});
-      });
+        }
+      }).catch(() => {});
     }
   }, [authenticatedUser?.email]);
 
@@ -140,13 +144,13 @@ function App() {
 
           {activePage === 'Complaint' && (
             <div className="animate-fade-in" style={{ paddingTop: '100px' }}>
-              <ComplaintCenter setActivePage={setActivePage} authenticatedUser={authenticatedUser} />
+              <ComplaintCenter key="submit-center" setActivePage={setActivePage} authenticatedUser={authenticatedUser} />
             </div>
           )}
 
           {activePage === 'Track Complaint' && (
             <div className="animate-fade-in" style={{ paddingTop: '100px' }}>
-              <ComplaintCenter setActivePage={setActivePage} showOnlyTrack={true} authenticatedUser={authenticatedUser} />
+              <ComplaintCenter key="track-center" setActivePage={setActivePage} showOnlyTrack={true} authenticatedUser={authenticatedUser} />
               <CivicWorkflow showOnlyLifecycle={true} />
             </div>
           )}

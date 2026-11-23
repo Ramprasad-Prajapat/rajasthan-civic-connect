@@ -88,6 +88,14 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.getComplaintDetail(idOrCode, caller));
     }
 
+    @GetMapping("/{idOrCode}/photo")
+    public ResponseEntity<Map<String, Object>> getComplaintPhoto(
+            @PathVariable String idOrCode,
+            @AuthenticationPrincipal User caller
+    ) {
+        return ResponseEntity.ok(complaintService.getComplaintPhoto(idOrCode, caller));
+    }
+
     @PutMapping("/{idOrCode}/status")
     public ResponseEntity<ComplaintResponse> updateStatus(
             @PathVariable String idOrCode,
@@ -112,5 +120,21 @@ public class ComplaintController {
         }
         Long newDepartmentId = Long.parseLong(deptIdVal.toString());
         return ResponseEntity.ok(complaintService.reassignDepartment(idOrCode, newDepartmentId, admin));
+    }
+
+    @PutMapping("/{idOrCode}/officer")
+    public ResponseEntity<ComplaintResponse> assignOfficer(
+            @PathVariable String idOrCode,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal User admin
+    ) {
+        Object officerIdVal = body.get("officerId");
+        if (officerIdVal == null) {
+            officerIdVal = body.get("id");
+        }
+        Long officerId = (officerIdVal != null && !officerIdVal.toString().isBlank())
+                ? Long.parseLong(officerIdVal.toString())
+                : null;
+        return ResponseEntity.ok(complaintService.assignOfficer(idOrCode, officerId, admin));
     }
 }

@@ -51,11 +51,11 @@ The production system is deployed across three specialized cloud platforms:
 - **Database Name:** `civic_connect` (Character Set: `utf8mb4`, Collation: `utf8mb4_unicode_ci`)
 - **Connection Security:** Enforced SSL (`sslMode=REQUIRED`, TLS 1.3)
 - **Tables (8 Entity Tables):**
-  - `users` — Citizen, Officer, Admin identities with BCrypt hashes
+  - `users` — Citizen, Officer, Admin identities with BCrypt hashes and 10-digit phone validation
   - `departments` — Municipal departments (Water, Sanitation, PWD, Electricity, General)
-  - `complaints` — Core grievance records with SLA tracking and geolocation
+  - `complaints` — Core grievance records with SLA tracking and Rajasthan ULB location hierarchy (District, ULB, Ward, Area)
   - `complaint_timelines` — Chronological audit trail of grievance status changes
-  - `complaint_media` — Photos and attachments linked to complaints
+  - `complaint_media` — Photos and attachments linked to complaints (lazy loaded)
   - `complaint_drafts` — Autosaved in-progress grievance forms
   - `feedback` — Post-resolution citizen satisfaction ratings and comments
   - `notifications` — Role-based notification events
@@ -97,36 +97,3 @@ The production system is deployed across three specialized cloud platforms:
 | Variable Name | Description | Value |
 |---|---|---|
 | `VITE_API_BASE_URL` | Base URL of the Spring Boot REST API | `https://civic-connect-api-bw8t.onrender.com/api` |
-
-> **Security Note:** Vite injects `VITE_` variables into client-side bundles at build time. Never place secrets, database credentials, or signing keys into `VITE_` variables.
-
----
-
-## 6. Security & Hardening Measures
-
-1. **CORS Enforcement:** The Spring Security filter chain restricts cross-origin resource access strictly to the configured Vercel production domain. Unrecognized origins receive HTTP `403 Forbidden`.
-2. **Stateless JWT:** Authentication uses short-lived JSON Web Tokens passed via the `Authorization: Bearer <token>` header. No session state is retained on the backend.
-3. **Password Security:** All passwords are encrypted with BCrypt (strength 10).
-4. **Zero Localhost Leaks:** Production build audits confirm zero hardcoded references to `localhost` in client-facing code.
-5. **Role-Based Authorization:**
-   - Citizens can only view and lodge their own grievances.
-   - Officers are restricted strictly to complaints within their assigned department.
-   - Administrative endpoints (`/api/admin/**`) are restricted exclusively to `ROLE_ADMIN`.
-
----
-
-## 7. Demo Accounts (Evaluation Only)
-
-| Role | Username / Email | Password | Scope / Permissions |
-|---|---|---|---|
-| **Citizen** | `citizen@civic.local` | `Citizen@123` | Lodge grievances, GPS tagging, timeline tracking |
-| **Water Officer** | `officer@civic.local` | `Officer@123` | Scoped to Water Department complaints & resolution |
-| **Sanitation Officer** | `sanitation.officer@civic.local` | `Officer@123` | Scoped to Sanitation Department complaints |
-| **Administrator** | `admin@civic.local` | `Admin@123` | Full governance, metrics, user & officer management |
-
----
-
-## 8. Operational Notes
-
-- **Render Cold Starts:** On Render's free tier, backend instances spin down after 15 minutes of inactivity. The initial incoming request may take 30–50 seconds to complete while the JVM container initializes.
-- **Aiven Inactivity:** Free-tier MySQL instances on Aiven may power down during extended periods of inactivity. Ensure the service is in the `RUNNING` state before traffic tests.

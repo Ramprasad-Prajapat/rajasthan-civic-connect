@@ -203,7 +203,7 @@ export default function Hero({ setActivePage }) {
                     </div>
                     <div>
                       <div className="fw-bold text-danger small">Resolution SLA Deadline</div>
-                      <div className="text-secondary small fw-semibold">6 Hours Remaining (SLA Target: 24h)</div>
+                      <div className="text-secondary small fw-semibold">Dynamic Countdown (from API SLA Deadline)</div>
                     </div>
                   </div>
 

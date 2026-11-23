@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { updateMyProfile, changePassword } from '../apiService';
+import { onlyDigits, normalizeMobile, isValidMobile, getMobileError, handleMobileKeyDown } from '../validators';
 
 export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser, setActivePage }) {
   const [fullName, setFullName] = useState(authenticatedUser?.name || authenticatedUser?.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(authenticatedUser?.phone || '');
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const phoneError = getMobileError(phoneNumber, false, phoneTouched);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -16,24 +19,46 @@ export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser
   // Alerts
   const [alert, setAlert] = useState(null);
 
+  React.useEffect(() => {
+    if (authenticatedUser) {
+      setFullName(authenticatedUser.name || authenticatedUser.fullName || '');
+      setPhoneNumber(onlyDigits(authenticatedUser.phone || authenticatedUser.mobile || ''));
+    }
+  }, [authenticatedUser]);
+
   const showAlert = (type, text) => {
     setAlert({ type, text });
     setTimeout(() => setAlert(null), 4000);
   };
 
+  const handleCancelEdit = () => {
+    setFullName(authenticatedUser?.name || authenticatedUser?.fullName || '');
+    setPhoneNumber(onlyDigits(authenticatedUser?.phone || authenticatedUser?.mobile || ''));
+    setPhoneTouched(false);
+    setIsEditingProfile(false);
+  };
+
   const handleProfileSave = async (e) => {
     e.preventDefault();
+    setPhoneTouched(true);
+    if (phoneNumber && !isValidMobile(phoneNumber, false)) {
+      showAlert('danger', getMobileError(phoneNumber, false, true) || 'Mobile number must be exactly 10 digits');
+      return;
+    }
     setProfileLoading(true);
     try {
-      const updated = await updateMyProfile({ name: fullName, phone: phoneNumber });
+      const normalizedPhone = phoneNumber ? normalizeMobile(phoneNumber) : '';
+      const updated = await updateMyProfile({ name: fullName.trim(), phone: normalizedPhone });
+      const updatedUser = {
+        ...authenticatedUser,
+        name: updated.name || fullName.trim(),
+        fullName: updated.name || fullName.trim(),
+        phone: updated.phone || normalizedPhone
+      };
       if (setAuthenticatedUser) {
-        setAuthenticatedUser({
-          ...authenticatedUser,
-          name: updated.name || fullName,
-          fullName: updated.name || fullName,
-          phone: updated.phone || phoneNumber
-        });
+        setAuthenticatedUser(updatedUser);
       }
+      localStorage.setItem('rajcivic_user', JSON.stringify(updatedUser));
       setIsEditingProfile(false);
       showAlert('success', 'Profile updated successfully!');
     } catch (err) {
@@ -139,11 +164,32 @@ export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser
                   <label className="form-label small fw-bold text-secondary mb-1">Phone Number</label>
                   <input
                     type="tel"
-                    className="form-control form-control-sm bg-light"
+                    inputMode="numeric"
+                    maxLength={Math.max(10, (phoneNumber || '').length)}
+                    autoComplete="tel-national"
+                    className={`form-control form-control-sm bg-light ${isEditingProfile && phoneError ? 'border border-danger' : ''}`}
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onKeyDown={handleMobileKeyDown}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData ? e.clipboardData.getData('text') : '';
+                      const normalized = normalizeMobile(pasted);
+                      setPhoneNumber(normalized);
+                      setPhoneTouched(true);
+                    }}
+                    onChange={(e) => {
+                      setPhoneTouched(true);
+                      setPhoneNumber(normalizeMobile(e.target.value));
+                    }}
+                    onBlur={() => setPhoneTouched(true)}
                     disabled={!isEditingProfile}
+                    placeholder="10-digit phone"
                   />
+                  {isEditingProfile && phoneError && (
+                    <div className="text-danger small mt-1 fw-semibold animate-fade-in" style={{ fontSize: '0.75rem' }}>
+                      <i className="bi bi-exclamation-circle me-1"></i>{phoneError}
+                    </div>
+                  )}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label small fw-bold text-secondary mb-1">Account Role</label>
@@ -169,7 +215,7 @@ export default function ProfilePreview({ authenticatedUser, setAuthenticatedUser
                       <button
                         type="button"
                         className="btn btn-outline-secondary btn-sm rounded-pill px-3"
-                        onClick={() => setIsEditingProfile(false)}
+                        onClick={handleCancelEdit}
                       >
                         Cancel
                       </button>

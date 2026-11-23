@@ -11,12 +11,10 @@ export default function CivicWorkflow({ showOnlyLifecycle, showOnlySlaAndEscalat
   ];
 
   const slaCards = [
-    { title: 'Sewer Overflow', priority: 'High Priority', time: '6 Hours SLA', bg: 'border-danger bg-danger-soft text-danger', icon: 'bi-exclamation-triangle-fill' },
-    { title: 'Dead Animal Pickup', priority: 'High Priority', time: '6 Hours SLA', bg: 'border-danger bg-danger-soft text-danger', icon: 'bi-shield-fill-exclamation' },
-    { title: 'Water Leakage', priority: 'High Priority', time: '12 Hours SLA', bg: 'border-warning bg-accent-soft text-warning', icon: 'bi-droplet-fill' },
-    { title: 'Garbage Complaint', priority: 'Medium Priority', time: '24 Hours SLA', bg: 'border-primary bg-primary-soft text-success', icon: 'bi-trash-fill' },
-    { title: 'Street Light', priority: 'Medium Priority', time: '48 Hours SLA', bg: 'border-primary bg-primary-soft text-success', icon: 'bi-lightbulb-fill' },
-    { title: 'Road / Pothole', priority: 'Medium Priority', time: '72 Hours SLA', bg: 'border-primary bg-secondary-soft text-primary', icon: 'bi-hammer' }
+    { title: 'Emergency Grievance', priority: 'Emergency Priority', time: '2 Hours SLA', bg: 'border-danger bg-danger-soft text-danger', icon: 'bi-exclamation-octagon-fill' },
+    { title: 'Critical Infrastructure', priority: 'Critical Priority', time: '6 Hours SLA', bg: 'border-danger bg-danger-soft text-danger', icon: 'bi-exclamation-triangle-fill' },
+    { title: 'High Priority Hazard', priority: 'High Priority', time: '12 Hours SLA', bg: 'border-warning bg-accent-soft text-warning', icon: 'bi-droplet-fill' },
+    { title: 'General Civic Grievance', priority: 'Normal Priority', time: '48 Hours SLA', bg: 'border-primary bg-primary-soft text-success', icon: 'bi-hammer' }
   ];
 
   return (

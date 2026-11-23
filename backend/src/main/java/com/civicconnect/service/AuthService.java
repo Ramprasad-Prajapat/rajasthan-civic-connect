@@ -50,11 +50,26 @@ public class AuthService {
             throw new ApiException(HttpStatus.CONFLICT, "Email is already registered");
         }
 
+        String rawMobile = request.mobile();
+        String normalizedMobile = null;
+        if (rawMobile != null && !rawMobile.isBlank()) {
+            String cleaned = rawMobile.replaceAll("[^0-9]", "");
+            if (cleaned.startsWith("91") && cleaned.length() == 12) {
+                cleaned = cleaned.substring(2);
+            } else if (cleaned.startsWith("0") && cleaned.length() == 11) {
+                cleaned = cleaned.substring(1);
+            }
+            if (!cleaned.matches("^\\d{10}$")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Mobile number must be exactly 10 digits");
+            }
+            normalizedMobile = cleaned;
+        }
+
         User user = new User(
                 request.name().trim(),
                 normalizedEmail,
                 passwordEncoder.encode(request.password()),
-                request.mobile(),
+                normalizedMobile,
                 Constants.ROLE_CITIZEN,
                 "citizen"
         );
@@ -77,16 +92,35 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        String normalizedEmail = request.email() != null ? request.email().toLowerCase().trim() : "";
+        String identifier = request.email() != null ? request.email().trim() : "";
+        String rawPassword = request.password() != null ? request.password().trim() : "";
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
+        User user = userRepository.findByEmail(identifier.toLowerCase()).orElse(null);
+        if (user == null) {
+            java.util.List<User> byPhone = userRepository.findByPhone(identifier);
+            for (User candidate : byPhone) {
+                if (passwordEncoder.matches(rawPassword, candidate.getPasswordHash())
+                        || (rawPassword.equalsIgnoreCase("Citizen@123") && "citizen@civic.local".equals(candidate.getEmail()))
+                        || (rawPassword.equalsIgnoreCase("Officer@123") && "officer@civic.local".equals(candidate.getEmail()))
+                        || (rawPassword.equalsIgnoreCase("Officer2@123") && "officer2@civic.local".equals(candidate.getEmail()))
+                        || (rawPassword.equalsIgnoreCase("Admin@123") && "admin@civic.local".equals(candidate.getEmail()))) {
+                    user = candidate;
+                    break;
+                }
+            }
+            if (user == null && !byPhone.isEmpty()) {
+                user = byPhone.get(0);
+            }
+        }
+
+        if (user == null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email, phone or password");
+        }
 
         if (user.getActive() != null && !user.getActive()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Account is disabled");
         }
 
-        String rawPassword = request.password() != null ? request.password().trim() : "";
         boolean matches = passwordEncoder.matches(rawPassword, user.getPasswordHash());
 
         // Forgiving password matching for demo accounts in development
@@ -144,10 +178,19 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
 
         if (body.containsKey("name") && body.get("name") != null) {
-            user.setName(body.get("name").toString().trim());
+            String name = body.get("name").toString().trim();
+            if (name.isEmpty()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Name cannot be empty");
+            }
+            user.setName(name);
         }
-        if (body.containsKey("phone") && body.get("phone") != null) {
-            user.setPhone(body.get("phone").toString().trim());
+        if (body.containsKey("phone") || body.containsKey("mobile")) {
+            Object phoneObj = body.containsKey("phone") ? body.get("phone") : body.get("mobile");
+            String phone = phoneObj != null ? phoneObj.toString().trim() : "";
+            if (!phone.isEmpty() && !phone.matches("^\\d{10}$")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Mobile number must be exactly 10 digits");
+            }
+            user.setPhone(phone);
         }
 
         User saved = userRepository.save(user);
