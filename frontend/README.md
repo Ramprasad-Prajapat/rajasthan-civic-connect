@@ -34,5 +34,5 @@ Responsive single-page application (SPA) for citizen grievance redressal and mun
 ## Production Deployment
 Deployed on Vercel Edge Network: `https://rajasthan-civic-connect.vercel.app`.
 
-Last deployment check: 2026-11-24 18:02
+Last deployment check: 2026-11-24 18:35
 
