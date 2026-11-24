@@ -31,3 +31,6 @@ Stateless REST API for municipal grievance redressal, department workflows, citi
 
 ## Production Deployment
 Packaged via multi-stage Dockerfile and deployed on Render: `https://civic-connect-api-bw8t.onrender.com`.
+
+Last deployment check: 2026-11-24 18:02
+

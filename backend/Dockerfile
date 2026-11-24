@@ -1,9 +1,10 @@
 # Build stage
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY settings-docker.xml .
 COPY pom.xml .
 COPY src ./src
-RUN mvn -q -DskipTests package
+RUN mvn -B -ntp -s settings-docker.xml -Dmaven.wagon.http.retryHandler.count=5 -Daether.connector.http.retryHandler.count=5 -DskipTests package
 
 # Runtime stage
 FROM eclipse-temurin:21-jre
