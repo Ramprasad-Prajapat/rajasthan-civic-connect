@@ -67,10 +67,9 @@ public class DataSeeder implements CommandLineRunner {
         Department elecDept = seedDepartmentIfMissing("Electricity Department", "ELEC", "Power Grid and Street Lighting", "elec@civic.local");
         Department generalDept = seedDepartmentIfMissing("General Municipal Department", "GEN", "General municipal grievances and administrative support", "general@civic.local");
 
-        // 2. Seed demo users
+        // 2. Seed demo users (4 officially documented demo accounts per README.md)
         User citizen = seedUserIfMissing("citizen@civic.local", "Demo Citizen", "Citizen@123", Constants.ROLE_CITIZEN, "citizen", null);
         seedUserIfMissing("officer@civic.local", "Officer Water", "Officer@123", Constants.ROLE_OFFICER, "department", waterDept.getId());
-        seedUserIfMissing("officer2@civic.local", "Officer Sanitation", "Officer@123", Constants.ROLE_OFFICER, "department", sanitationDept.getId());
         seedUserIfMissing("sanitation.officer@civic.local", "Officer Sanitation", "Officer@123", Constants.ROLE_OFFICER, "department", sanitationDept.getId());
         seedUserIfMissing("admin@civic.local", "System Administrator", "Admin@123", Constants.ROLE_ADMIN, "admin", null);
 
